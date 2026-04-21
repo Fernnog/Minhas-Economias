@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Minhas Economias - Local</title>
+    <style>
+        :root {
+            --primary: #2e7d32; /* Verde clássico de finanças */
+            --danger: #d32f2f;
+            --bg: #f4f6f8;
+            --card: #ffffff;
+            --text: #333333;
+            --border: #e0e0e0;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        
+        body { background-color: var(--bg); color: var(--text); display: flex; flex-direction: column; min-height: 100vh; }
+        
+        header { background-color: var(--primary); color: white; padding: 1rem 2rem; display: flex; justify-content: space-between; align-items: center; }
+        
+        main { display: grid; grid-template-columns: 300px 1fr; gap: 2rem; padding: 2rem; flex: 1; }
+        
+        .card { background: var(--card); padding: 1.5rem; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 1rem; }
+        
+        .balance-box { text-align: center; font-size: 1.5rem; }
+        .balance-box h2 { font-size: 2.5rem; color: var(--primary); margin-top: 0.5rem; }
+        .balance-box.negative h2 { color: var(--danger); }
+
+        h3 { margin-bottom: 1rem; border-bottom: 2px solid var(--border); padding-bottom: 0.5rem; }
+
+        form { display: flex; flex-direction: column; gap: 1rem; }
+        label { font-size: 0.9rem; font-weight: bold; }
+        input, select, button { padding: 0.75rem; border: 1px solid var(--border); border-radius: 4px; font-size: 1rem; }
+        input[type="checkbox"] { width: auto; display: inline-block; }
+        .checkbox-group { display: flex; align-items: center; gap: 0.5rem; }
+        
+        button { background-color: var(--primary); color: white; border: none; cursor: pointer; font-weight: bold; transition: 0.2s; }
+        button:hover { opacity: 0.9; }
+        
+        table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
+        th, td { padding: 1rem; text-align: left; border-bottom: 1px solid var(--border); }
+        th { background-color: var(--bg); }
+        .receita { color: var(--primary); font-weight: bold; }
+        .despesa { color: var(--danger); font-weight: bold; }
+        
+        .actions button { padding: 0.4rem 0.8rem; font-size: 0.8rem; margin-right: 0.5rem; background-color: #555; }
+        .actions button.delete { background-color: var(--danger); }
+
+        /* Responsividade Básica */
+        @media (max-width: 768px) {
+            main { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>Painel Financeiro</h1>
+        <div id="header-date"></div>
+    </header>
+
+    <main>
+        <aside>
+            <div class="card balance-box" id="balance-card">
+                <p>Saldo Atual</p>
+                <h2 id="saldo-display">R$ 0,00</h2>
+            </div>
+
+            <div class="card">
+                <h3>Novo Lançamento</h3>
+                <form id="transaction-form">
+                    <input type="hidden" id="trans-id">
+                    
+                    <label>Tipo</label>
+                    <select id="trans-type" required>
+                        <option value="despesa">Despesa</option>
+                        <option value="receita">Receita</option>
+                    </select>
+
+                    <label>Valor (R$)</label>
+                    <input type="number" id="trans-amount" step="0.01" min="0.01" required>
+
+                    <label>Categoria</label>
+                    <select id="trans-category" required>
+                        </select>
+
+                    <label>Data</label>
+                    <input type="date" id="trans-date" required>
+
+                    <label>Descrição</label>
+                    <input type="text" id="trans-desc" required>
+
+                    <div class="checkbox-group">
+                        <input type="checkbox" id="trans-recurrence">
+                        <label for="trans-recurrence">Lançamento Recorrente (Mensal)</label>
+                    </div>
+
+                    <button type="submit" id="btn-save">Salvar Lançamento</button>
+                </form>
+            </div>
+
+            <div class="card">
+                <h3>Gerenciar Categorias</h3>
+                <form id="category-form">
+                    <input type="text" id="new-category" placeholder="Nova categoria..." required>
+                    <button type="submit" style="margin-top: 0.5rem;">Adicionar</button>
+                </form>
+            </div>
+        </aside>
+
+        <section>
+            <div class="card">
+                <h3>Extrato de Lançamentos</h3>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Data</th>
+                            <th>Descrição</th>
+                            <th>Categoria</th>
+                            <th>Tipo</th>
+                            <th>Valor</th>
+                            <th>Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody id="transaction-list">
+                        </tbody>
+                </table>
+            </div>
+        </section>
+    </main>
+
+    <script>
+        // === STATE MANAGEMENT ===
+        let transactions = JSON.parse(localStorage.getItem('fin_transactions')) || [];
+        let categories = JSON.parse(localStorage.getItem('fin_categories')) || ['Alimentação', 'Moradia', 'Transporte', 'Salário'];
+
+        // === DOM ELEMENTS ===
+        const form = document.getElementById('transaction-form');
+        const list = document.getElementById('transaction-list');
+        const saldoDisplay = document.getElementById('saldo-display');
+        const balanceCard = document.getElementById('balance-card');
+        const categorySelect = document.getElementById('trans-category');
+        const categoryForm = document.getElementById('category-form');
+
+        // === INITIALIZATION ===
+        function init() {
+            document.getElementById('header-date').innerText = new Date().toLocaleDateString('pt-BR');
+            document.getElementById('trans-date').valueAsDate = new Date();
+            updateCategorySelect();
+            renderTransactions();
+            updateBalance();
+        }
+
+        // === CORE FUNCTIONS ===
+        function saveData() {
+            localStorage.setItem('fin_transactions', JSON.stringify(transactions));
+            localStorage.setItem('fin_categories', JSON.stringify(categories));
+        }
+
+        function updateBalance() {
+            const total = transactions.reduce((acc, trans) => {
+                return trans.type === 'receita' ? acc + trans.amount : acc - trans.amount;
+            }, 0);
+
+            saldoDisplay.innerText = total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+            
+            if (total < 0) {
+                balanceCard.classList.add('negative');
+            } else {
+                balanceCard.classList.remove('negative');
+            }
+        }
+
+        function renderTransactions() {
+            list.innerHTML = '';
+            
+            // Ordenar por data (mais recente primeiro)
+            const sorted = [...transactions].sort((a, b) => new Date(b.date) - new Date(a.date));
+
+            sorted.forEach(trans => {
+                const tr = document.createElement('tr');
+                const formattedDate = new Date(trans.date).toLocaleDateString('pt-BR', {timeZone: 'UTC'});
+                const formattedAmount = trans.amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+                const cssClass = trans.type === 'receita' ? 'receita' : 'despesa';
+                const recIcon = trans.isRecurring ? ' 🔄' : '';
+
+                tr.innerHTML = `
+                    <td>${formattedDate}</td>
+                    <td>${trans.desc}${recIcon}</td>
+                    <td>${trans.category}</td>
+                    <td class="${cssClass}">${trans.type.toUpperCase()}</td>
+                    <td class="${cssClass}">${formattedAmount}</td>
+                    <td class="actions">
+                        <button onclick="editTransaction('${trans.id}')">Editar</button>
+                        <button class="delete" onclick="deleteTransaction('${trans.id}')">Excluir</button>
+                    </td>
+                `;
+                list.appendChild(tr);
+            });
+        }
+
+        function updateCategorySelect() {
+            categorySelect.innerHTML = '';
+            categories.sort().forEach(cat => {
+                const option = document.createElement('option');
+                option.value = cat;
+                option.innerText = cat;
+                categorySelect.appendChild(option);
+            });
+        }
+
+        // === EVENT HANDLERS ===
+        form.addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const id = document.getElementById('trans-id').value;
+            const type = document.getElementById('trans-type').value;
+            const amount = parseFloat(document.getElementById('trans-amount').value);
+            const category = document.getElementById('trans-category').value;
+            const date = document.getElementById('trans-date').value;
+            const desc = document.getElementById('trans-desc').value;
+            const isRecurring = document.getElementById('trans-recurrence').checked;
+
+            const transactionData = {
+                id: id ? id : Date.now().toString(),
+                type,
+                amount,
+                category,
+                date,
+                desc,
+                isRecurring
+            };
+
+            if (id) {
+                // Modo Edição
+                const index = transactions.findIndex(t => t.id === id);
+                transactions[index] = transactionData;
+                document.getElementById('btn-save').innerText = 'Salvar Lançamento';
+            } else {
+                // Modo Novo
+                transactions.push(transactionData);
+                
+                // Lógica simples de recorrência (Gera o mês seguinte automaticamente)
+                if(isRecurring) {
+                    const nextDate = new Date(date);
+                    nextDate.setUTCMonth(nextDate.getUTCMonth() + 1);
+                    transactions.push({
+                        ...transactionData,
+                        id: (Date.now() + 1).toString(),
+                        date: nextDate.toISOString().split('T')[0],
+                        desc: desc + ' (Recorrente)'
+                    });
+                }
+            }
+
+            saveData();
+            renderTransactions();
+            updateBalance();
+            form.reset();
+            document.getElementById('trans-id').value = '';
+            document.getElementById('trans-date').valueAsDate = new Date();
+        });
+
+        categoryForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            const newCat = document.getElementById('new-category').value.trim();
+            if (newCat && !categories.includes(newCat)) {
+                categories.push(newCat);
+                saveData();
+                updateCategorySelect();
+                document.getElementById('new-category').value = '';
+            }
+        });
+
+        // === CRUD ACTIONS ===
+        window.deleteTransaction = function(id) {
+            if (confirm('Deseja realmente excluir este lançamento?')) {
+                transactions = transactions.filter(t => t.id !== id);
+                saveData();
+                renderTransactions();
+                updateBalance();
+            }
+        }
+
+        window.editTransaction = function(id) {
+            const trans = transactions.find(t => t.id === id);
+            if (trans) {
+                document.getElementById('trans-id').value = trans.id;
+                document.getElementById('trans-type').value = trans.type;
+                document.getElementById('trans-amount').value = trans.amount;
+                document.getElementById('trans-category').value = trans.category;
+                document.getElementById('trans-date').value = trans.date;
+                document.getElementById('trans-desc').value = trans.desc;
+                document.getElementById('trans-recurrence').checked = trans.isRecurring;
+                
+                document.getElementById('btn-save').innerText = 'Atualizar Lançamento';
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            }
+        }
+
+        // Run
+        init();
+    </script>
+</body>
+</html>
