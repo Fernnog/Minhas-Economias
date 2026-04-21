@@ -199,6 +199,9 @@ form.addEventListener('submit', function(e) {
     }
 
     saveData();
+    if (typeof FirebaseModule !== 'undefined') {
+    transactions.forEach(t => FirebaseModule.syncData('transactions', t));
+}
     updateAllViews();
     
     form.reset();
