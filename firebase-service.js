@@ -24,6 +24,7 @@ const FirebaseModule = (function() {
         auth.onAuthStateChanged((user) => {
             if (user) {
                 console.log('🟢 [Firebase] Status: Conectado como', user.email);
+                fetchUserData(); 
                 if (toggleBtn) {
                     toggleBtn.style.color = 'var(--primary)';
                     toggleBtn.title = "Conta Conectada (" + user.email + ")";
