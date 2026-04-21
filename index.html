@@ -92,10 +92,19 @@
                             <input type="date" id="trans-date" required>
                             <label>Descrição</label>
                             <input type="text" id="trans-desc" required>
-                            <div class="checkbox-group">
-                                <input type="checkbox" id="trans-recurrence">
-                                <label for="trans-recurrence">Recorrente (Mensal)</label>
+                            
+                            <label>Tipo de Repetição</label>
+                            <select id="trans-recurrence-type">
+                                <option value="unica">Única</option>
+                                <option value="recorrente">Recorrente (Fixa Indefinida)</option>
+                                <option value="parcelada">Compra Parcelada</option>
+                            </select>
+                            
+                            <div id="parcelas-container" class="hidden" style="margin-top: 0.5rem; margin-bottom: 1rem;">
+                                <label>Número de Parcelas</label>
+                                <input type="number" id="trans-installments" min="2" max="72" value="2">
                             </div>
+                            
                             <button type="submit" id="btn-save">Salvar Lançamento</button>
                         </form>
                     </div>
