@@ -18,22 +18,24 @@ const ExtractModule = (function() {
         if (!list) return;
         list.innerHTML = '';
         
-        // 1. Filtragem e Projeção de Recorrentes
         const filtered = [];
         transactions.forEach(t => {
             const d = new Date(t.date + 'T00:00:00');
             const tMonth = d.getMonth();
             const tYear = d.getFullYear();
             
-            // É do mês atual?
             if (tMonth === currentMonth && tYear === currentYear) {
                 filtered.push(t);
             } 
-            // É recorrente e de um mês passado? Projeta para a visualização atual
             else if (t.isRecurring && (tYear < currentYear || (tYear === currentYear && tMonth < currentMonth))) {
+                // Verificação de interrupção: Se existir data de término e o mês visualizado for posterior ou igual a ela, não projeta
+                if (t.recurrenceEndDate && new Date(currentYear, currentMonth, 1) >= new Date(t.recurrenceEndDate)) {
+                    return;
+                }
+
                 filtered.push({
                     ...t,
-                    id: t.id + '_proj', // ID virtual 
+                    id: t.id + '_proj', 
                     date: `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
                 });
             }
@@ -46,7 +48,6 @@ const ExtractModule = (function() {
             return acc;
         }, 0);
 
-        // 2. Agrupamento Diário
         const groups = [...filtered].sort((a,b) => new Date(a.date) - new Date(b.date)).reduce((acc, t) => {
             if (!acc[t.date]) acc[t.date] = { items: [], dayBalance: 0 };
             balance += (t.type === 'receita' ? t.amount : -t.amount);
@@ -55,7 +56,6 @@ const ExtractModule = (function() {
             return acc;
         }, {});
 
-        // 3. Renderização (Mais recentes primeiro)
         Object.keys(groups).sort((a,b) => new Date(b) - new Date(a)).forEach(date => {
             const group = groups[date];
             const dateLabel = new Date(date + 'T00:00:00').toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: 'short' }).toUpperCase();
@@ -76,7 +76,11 @@ const ExtractModule = (function() {
                             <button onclick="deleteTransaction('${t.id}')" title="Excluir">
                                 <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="var(--danger)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
                             </button>
-                            ` : '<span style="font-size:0.8rem; color:var(--text-light);">Automático</span>'}
+                            ` : `
+                            <button onclick="stopRecurrence('${t.id}')" title="Parar Repetição" style="color: var(--danger);">
+                                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"></line></svg>
+                            </button>
+                            `}
                         </td>
                     </tr>`;
             });
