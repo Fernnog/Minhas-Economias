@@ -111,7 +111,44 @@ const FirebaseModule = (function() {
         }
     }
 
-    return { init, syncData, deleteData };
+    async function fetchUserData() {
+        if (!auth.currentUser) return;
+        const uid = auth.currentUser.uid;
+        try {
+            // A) Sincronizar Transações
+            const transRef = await db.collection('users').doc(uid).collection('transactions').get();
+            if(!transRef.empty) {
+                transactions = transRef.docs.map(doc => doc.data());
+                localStorage.setItem('fin_transactions', JSON.stringify(transactions));
+            }
+
+            // B) Sincronizar Categorias
+            const catRef = await db.collection('users').doc(uid).collection('categories').get();
+            if(!catRef.empty) {
+                categories = catRef.docs.map(doc => doc.data().name);
+                localStorage.setItem('fin_categories', JSON.stringify(categories));
+            }
+
+            // C) Sincronizar Orçamentos
+            const budgetRef = await db.collection('users').doc(uid).collection('budgets').get();
+            if(!budgetRef.empty) {
+                const budgetData = budgetRef.docs.map(doc => doc.data());
+                localStorage.setItem('fin_budgets', JSON.stringify(budgetData));
+                if (typeof BudgetModule !== 'undefined') BudgetModule.loadFromStorage();
+            }
+
+            // D) Atualizar a Interface do Usuário com os dados baixados
+            if (typeof updateCategorySelect === 'function') updateCategorySelect();
+            if (typeof BudgetModule !== 'undefined') BudgetModule.updateCategoryOptions();
+            if (typeof updateAllViews === 'function') updateAllViews();
+
+            console.log('🔄 [Firebase] Sincronização de entrada (Download) concluída!');
+        } catch (error) {
+            console.error('❌ Erro ao buscar dados da nuvem:', error);
+        }
+    }
+
+    return { init, syncData, deleteData, fetchUserData };
 })();
 
 document.addEventListener('DOMContentLoaded', () => FirebaseModule.init());
