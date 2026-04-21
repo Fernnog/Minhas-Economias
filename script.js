@@ -218,8 +218,17 @@ categoryForm.addEventListener('submit', function(e) {
     
     if (formattedCat && !categories.includes(formattedCat)) {
         categories.push(formattedCat);
-        saveData();
+        saveData(); // Salva local
+        
+        // Sincroniza a nova categoria com a nuvem
+        if (typeof FirebaseModule !== 'undefined') {
+            FirebaseModule.syncData('categories', { id: formattedCat, name: formattedCat });
+        }
+        
+        // Atualiza seletores no Form Principal e no módulo de Orçamento
         updateCategorySelect();
+        if (typeof BudgetModule !== 'undefined') BudgetModule.updateCategoryOptions();
+        
         document.getElementById('new-category').value = '';
         categorySelect.value = formattedCat;
     }
