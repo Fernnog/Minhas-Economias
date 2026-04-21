@@ -149,7 +149,13 @@ const BudgetModule = (function() {
         }).join('') || '<p class="text-light" style="text-align:center;">Nenhum orçamento definido para este mês.</p>';
     }
 
-    return { init, render, edit, remove };
+    function loadFromStorage() {
+        const rawBudgets = JSON.parse(localStorage.getItem('fin_budgets'));
+        budgetLimits = Array.isArray(rawBudgets) ? rawBudgets : [];
+        render();
+    }
+
+    return { init, render, edit, remove, updateCategoryOptions, loadFromStorage };
 })();
 
 document.addEventListener('DOMContentLoaded', () => BudgetModule.init());
