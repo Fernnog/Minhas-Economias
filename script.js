@@ -68,11 +68,6 @@ window.showView = function(targetView) {
 function saveData() {
     localStorage.setItem('fin_transactions', JSON.stringify(transactions));
     localStorage.setItem('fin_categories', JSON.stringify(categories));
-    
-    // Sincronização Firebase (Loop de Transações)
-    if (typeof FirebaseModule !== 'undefined') {
-        transactions.forEach(t => FirebaseModule.syncData('transactions', t));
-    }
 }
 
 function updateAllViews() {
@@ -89,20 +84,45 @@ function updateDashboardData() {
     let saldoFimMesTotal = 0;
     const gastosPorCategoria = {};
 
-    transactions.forEach(trans => {
+    const todasTransacoes = [];
+
+    // Passo 1: Mesma lógica do extract.js para projetar recorrentes e não haver divergência
+    transactions.forEach(t => {
+        const d = new Date(t.date + 'T00:00:00');
+        const tMonth = d.getMonth();
+        const tYear = d.getFullYear();
+
+        todasTransacoes.push(t); // Adiciona a original
+
+        // Projeta se for recorrente de um mês anterior
+        if (t.isRecurring && (tYear < anoAtual || (tYear === anoAtual && tMonth < mesAtual))) {
+            todasTransacoes.push({
+                ...t,
+                date: `${anoAtual}-${String(mesAtual + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+            });
+        }
+    });
+
+    // Passo 2: Calcula baseado na lista unificada (reais + projetadas)
+    todasTransacoes.forEach(trans => {
         const dataTrans = new Date(trans.date + 'T00:00:00'); 
         const isMesmoMes = dataTrans.getMonth() === mesAtual && dataTrans.getFullYear() === anoAtual;
         
-        if (trans.type === 'receita') {
-            saldoFimMesTotal += trans.amount;
-            if (dataTrans <= hoje) saldoAtualTotal += trans.amount;
-        } else {
-            saldoFimMesTotal -= trans.amount;
-            if (dataTrans <= hoje) saldoAtualTotal -= trans.amount;
-            
-            if (isMesmoMes) {
-                gastosPorCategoria[trans.category] = (gastosPorCategoria[trans.category] || 0) + trans.amount;
-            }
+        // Saldo Atual: Tudo até a data de hoje
+        if (dataTrans <= hoje) {
+            if (trans.type === 'receita') saldoAtualTotal += trans.amount;
+            else saldoAtualTotal -= trans.amount;
+        }
+
+        // Saldo Fim do Mês: Tudo até hoje + Lançamentos futuros do mês atual
+        if (dataTrans <= hoje || isMesmoMes) {
+            if (trans.type === 'receita') saldoFimMesTotal += trans.amount;
+            else saldoFimMesTotal -= trans.amount;
+        }
+        
+        // Gráfico de Categorias: Apenas despesas do mês atual
+        if (trans.type === 'despesa' && isMesmoMes) {
+            gastosPorCategoria[trans.category] = (gastosPorCategoria[trans.category] || 0) + trans.amount;
         }
     });
 
@@ -179,29 +199,38 @@ form.addEventListener('submit', function(e) {
         type, amount, category, date, desc, isRecurring
     };
 
+    const newItemsToSync = []; // Fila cirúrgica de sincronização para a nuvem
+
     if (id) {
         const index = transactions.findIndex(t => t.id === id);
         transactions[index] = transactionData;
+        newItemsToSync.push(transactionData);
         document.getElementById('btn-save').innerText = 'Salvar Lançamento';
     } else {
         transactions.push(transactionData);
+        newItemsToSync.push(transactionData);
         
         if(isRecurring) {
             const nextDate = new Date(date + 'T00:00:00');
             nextDate.setMonth(nextDate.getMonth() + 1);
-            transactions.push({
+            const recTrans = {
                 ...transactionData,
-                id: (Date.now() + 1).toString(),
+                id: (Date.now() + 1).toString(), // Garante um ID único
                 date: nextDate.toISOString().split('T')[0],
                 desc: desc + ' (Recorrente)'
-            });
+            };
+            transactions.push(recTrans);
+            newItemsToSync.push(recTrans);
         }
     }
 
-    saveData();
+    saveData(); // Salva localmente (agora sem o loop do Firebase)
+    
+    // Sincronização Cirúrgica no Firebase (apenas os itens novos/editados)
     if (typeof FirebaseModule !== 'undefined') {
-    transactions.forEach(t => FirebaseModule.syncData('transactions', t));
-}
+        newItemsToSync.forEach(t => FirebaseModule.syncData('transactions', t));
+    }
+    
     updateAllViews();
     
     form.reset();
