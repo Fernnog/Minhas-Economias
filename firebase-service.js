@@ -18,6 +18,24 @@ const FirebaseModule = (function() {
         const toggleBtn = document.getElementById('btn-login-toggle');
         const panel = document.getElementById('login-panel');
         const form = document.getElementById('login-form');
+        const feedbackMsg = document.getElementById('auth-feedback');
+
+        // --- MONITORAMENTO DE ESTADO ---
+        auth.onAuthStateChanged((user) => {
+            if (user) {
+                console.log('🟢 [Firebase] Status: Conectado como', user.email);
+                if (toggleBtn) {
+                    toggleBtn.style.color = 'var(--primary)';
+                    toggleBtn.title = "Conta Conectada (" + user.email + ")";
+                }
+            } else {
+                console.log('⚪ [Firebase] Status: Desconectado.');
+                if (toggleBtn) {
+                    toggleBtn.style.color = 'currentColor';
+                    toggleBtn.title = "Acessar Conta";
+                }
+            }
+        });
 
         if (toggleBtn) {
             toggleBtn.addEventListener('click', () => panel.classList.toggle('hidden'));
@@ -29,24 +47,47 @@ const FirebaseModule = (function() {
                 const email = document.getElementById('auth-email').value;
                 const pass = document.getElementById('auth-password').value;
                 
+                console.log('⏳ [Firebase] Tentando logar com o email:', email);
+                
+                if (feedbackMsg) {
+                    feedbackMsg.style.display = 'block';
+                    feedbackMsg.style.color = 'var(--text-light)';
+                    feedbackMsg.textContent = 'Autenticando...';
+                }
+
                 auth.signInWithEmailAndPassword(email, pass)
-                    .then(() => {
-                        panel.classList.add('hidden');
-                        toggleBtn.style.color = 'var(--primary)'; // Feedback visual
+                    .then((userCredential) => {
+                        console.log('✅ [Firebase] Sucesso! ID do usuário:', userCredential.user.uid);
+                        
+                        if (feedbackMsg) {
+                            feedbackMsg.style.color = 'var(--primary)';
+                            feedbackMsg.textContent = 'Conectado com sucesso!';
+                        }
+
+                        setTimeout(() => {
+                            panel.classList.add('hidden');
+                            if (feedbackMsg) feedbackMsg.style.display = 'none';
+                        }, 1500);
+
                         form.reset();
-                        // Opcional: Recarregar dados após login
                         if (typeof updateAllViews === 'function') updateAllViews();
                     })
-                    .catch(err => alert('Falha na autenticação: ' + err.message));
+                    .catch(err => {
+                        console.error('❌ [Firebase] Erro de Autenticação. Código:', err.code, ' | Detalhe:', err.message);
+                        
+                        if (feedbackMsg) {
+                            feedbackMsg.style.color = 'var(--danger)';
+                            if (err.code === 'auth/invalid-credential' || err.code === 'auth/wrong-password' || err.code === 'auth/user-not-found') {
+                                feedbackMsg.textContent = 'E-mail ou senha incorretos.';
+                            } else {
+                                feedbackMsg.textContent = 'Erro na conexão. Veja o console.';
+                            }
+                        }
+                    });
             });
         }
     }
 
-    /**
-     * Sincroniza um documento individual com o Firestore.
-     * @param {string} collectionName - 'transactions' ou 'budgets'
-     * @param {Object} dataObj - O objeto de dado com ID.
-     */
     async function syncData(collectionName, dataObj) {
         if (!auth.currentUser) {
             console.warn(`Usuário não autenticado. ${collectionName} salvo apenas localmente.`);
@@ -60,11 +101,6 @@ const FirebaseModule = (function() {
         }
     }
 
-    /**
-     * Remove um documento do Firestore.
-     * @param {string} collectionName 
-     * @param {string} id 
-     */
     async function deleteData(collectionName, id) {
         if (!auth.currentUser) return;
         try {
@@ -78,5 +114,4 @@ const FirebaseModule = (function() {
     return { init, syncData, deleteData };
 })();
 
-// Inicializa a interface de auth quando o DOM carregar
 document.addEventListener('DOMContentLoaded', () => FirebaseModule.init());
