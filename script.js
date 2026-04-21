@@ -7,10 +7,23 @@ const form = document.getElementById('transaction-form');
 const list = document.getElementById('transaction-list');
 const categorySelect = document.getElementById('trans-category');
 const categoryForm = document.getElementById('category-form');
+const recurrenceSelect = document.getElementById('trans-recurrence-type');
+const parcelasContainer = document.getElementById('parcelas-container');
 
 // Views
 const dashboardView = document.getElementById('dashboard-view');
 const managementView = document.getElementById('management-view');
+
+// Logic for Recurrence UI
+if(recurrenceSelect) {
+    recurrenceSelect.addEventListener('change', (e) => {
+        if(e.target.value === 'parcelada') {
+            parcelasContainer.classList.remove('hidden');
+        } else {
+            parcelasContainer.classList.add('hidden');
+        }
+    });
+}
 
 // === INITIALIZATION ===
 function init() {
@@ -192,35 +205,50 @@ form.addEventListener('submit', function(e) {
     const category = document.getElementById('trans-category').value;
     const date = document.getElementById('trans-date').value;
     const desc = document.getElementById('trans-desc').value;
-    const isRecurring = document.getElementById('trans-recurrence').checked;
-
-    const transactionData = {
-        id: id ? id : Date.now().toString(),
-        type, amount, category, date, desc, isRecurring
-    };
+    
+    // Novas variáveis de controle de repetição
+    const recurrenceType = document.getElementById('trans-recurrence-type') ? document.getElementById('trans-recurrence-type').value : 'unica';
+    const isRecurring = (recurrenceType === 'recorrente');
+    const isParcelada = (recurrenceType === 'parcelada');
+    const installments = parseInt(document.getElementById('trans-installments')?.value || 1);
 
     const newItemsToSync = []; // Fila cirúrgica de sincronização para a nuvem
 
     if (id) {
+        // Modo Edição: Atualiza apenas o lançamento atual
+        const transactionData = { id, type, amount, category, date, desc, isRecurring };
         const index = transactions.findIndex(t => t.id === id);
         transactions[index] = transactionData;
         newItemsToSync.push(transactionData);
         document.getElementById('btn-save').innerText = 'Salvar Lançamento';
     } else {
-        transactions.push(transactionData);
-        newItemsToSync.push(transactionData);
-        
-        if(isRecurring) {
-            const nextDate = new Date(date + 'T00:00:00');
-            nextDate.setMonth(nextDate.getMonth() + 1);
-            const recTrans = {
-                ...transactionData,
-                id: (Date.now() + 1).toString(), // Garante um ID único
-                date: nextDate.toISOString().split('T')[0],
-                desc: desc + ' (Recorrente)'
-            };
-            transactions.push(recTrans);
-            newItemsToSync.push(recTrans);
+        // Modo Criação
+        if (isParcelada) {
+            // Gera N lançamentos independentes dividindo o valor total
+            const baseDate = new Date(date + 'T00:00:00');
+            const valorParcela = amount / installments; 
+            
+            for (let i = 0; i < installments; i++) {
+                const instDate = new Date(baseDate);
+                instDate.setMonth(instDate.getMonth() + i);
+                
+                const instData = {
+                    id: Date.now().toString() + i, // ID único sequencial
+                    type, 
+                    amount: valorParcela, 
+                    category, 
+                    date: instDate.toISOString().split('T')[0], 
+                    desc: `${desc} (${i + 1}/${installments})`, 
+                    isRecurring: false
+                };
+                transactions.push(instData);
+                newItemsToSync.push(instData);
+            }
+        } else {
+            // Única ou Recorrente (Removemos o bug que gerava o 2º mês fisicamente)
+            const transactionData = { id: Date.now().toString(), type, amount, category, date, desc, isRecurring };
+            transactions.push(transactionData);
+            newItemsToSync.push(transactionData);
         }
     }
 
@@ -236,6 +264,12 @@ form.addEventListener('submit', function(e) {
     form.reset();
     document.getElementById('trans-id').value = '';
     document.getElementById('trans-date').valueAsDate = new Date();
+    
+    // Reseta visualmente o seletor de recorrência para evitar comportamento inesperado
+    if (recurrenceSelect) {
+        recurrenceSelect.value = 'unica';
+        recurrenceSelect.dispatchEvent(new Event('change'));
+    }
     
     showDashboard();
 });
@@ -287,7 +321,12 @@ window.editTransaction = function(id) {
         document.getElementById('trans-category').value = trans.category;
         document.getElementById('trans-date').value = trans.date;
         document.getElementById('trans-desc').value = trans.desc;
-        document.getElementById('trans-recurrence').checked = trans.isRecurring;
+        
+        // Configuração segura do novo seletor no lugar do checkbox antigo
+        if (recurrenceSelect) {
+            recurrenceSelect.value = trans.isRecurring ? 'recorrente' : 'unica';
+            recurrenceSelect.dispatchEvent(new Event('change'));
+        }
         
         document.getElementById('btn-save').innerText = 'Atualizar Lançamento';
         
