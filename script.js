@@ -99,41 +99,41 @@ function updateDashboardData() {
 
     const todasTransacoes = [];
 
-    // Passo 1: Mesma lógica do extract.js para projetar recorrentes e não haver divergência
     transactions.forEach(t => {
         const d = new Date(t.date + 'T00:00:00');
         const tMonth = d.getMonth();
         const tYear = d.getFullYear();
 
-        todasTransacoes.push(t); // Adiciona a original
+        todasTransacoes.push(t); 
 
-        // Projeta se for recorrente de um mês anterior
+        // Projeta se for recorrente e não tiver data de término ou se a projeção for anterior à data de término
         if (t.isRecurring && (tYear < anoAtual || (tYear === anoAtual && tMonth < mesAtual))) {
-            todasTransacoes.push({
-                ...t,
-                date: `${anoAtual}-${String(mesAtual + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-            });
+            const dataProjetada = new Date(anoAtual, mesAtual, d.getDate());
+            const dataTermino = t.recurrenceEndDate ? new Date(t.recurrenceEndDate) : null;
+            
+            if (!dataTermino || dataProjetada < dataTermino) {
+                todasTransacoes.push({
+                    ...t,
+                    date: `${anoAtual}-${String(mesAtual + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+                });
+            }
         }
     });
 
-    // Passo 2: Calcula baseado na lista unificada (reais + projetadas)
     todasTransacoes.forEach(trans => {
         const dataTrans = new Date(trans.date + 'T00:00:00'); 
         const isMesmoMes = dataTrans.getMonth() === mesAtual && dataTrans.getFullYear() === anoAtual;
         
-        // Saldo Atual: Tudo até a data de hoje
         if (dataTrans <= hoje) {
             if (trans.type === 'receita') saldoAtualTotal += trans.amount;
             else saldoAtualTotal -= trans.amount;
         }
 
-        // Saldo Fim do Mês: Tudo até hoje + Lançamentos futuros do mês atual
         if (dataTrans <= hoje || isMesmoMes) {
             if (trans.type === 'receita') saldoFimMesTotal += trans.amount;
             else saldoFimMesTotal -= trans.amount;
         }
         
-        // Gráfico de Categorias: Apenas despesas do mês atual
         if (trans.type === 'despesa' && isMesmoMes) {
             gastosPorCategoria[trans.category] = (gastosPorCategoria[trans.category] || 0) + trans.amount;
         }
@@ -206,36 +206,40 @@ form.addEventListener('submit', function(e) {
     const date = document.getElementById('trans-date').value;
     const desc = document.getElementById('trans-desc').value;
     
-    // Novas variáveis de controle de repetição
     const recurrenceType = document.getElementById('trans-recurrence-type') ? document.getElementById('trans-recurrence-type').value : 'unica';
     const isRecurring = (recurrenceType === 'recorrente');
     const isParcelada = (recurrenceType === 'parcelada');
     const installments = parseInt(document.getElementById('trans-installments')?.value || 1);
 
-    const newItemsToSync = []; // Fila cirúrgica de sincronização para a nuvem
+    const newItemsToSync = [];
 
     if (id) {
-        // Modo Edição: Atualiza apenas o lançamento atual
         const transactionData = { id, type, amount, category, date, desc, isRecurring };
         const index = transactions.findIndex(t => t.id === id);
         transactions[index] = transactionData;
         newItemsToSync.push(transactionData);
         document.getElementById('btn-save').innerText = 'Salvar Lançamento';
     } else {
-        // Modo Criação
         if (isParcelada) {
-            // Gera N lançamentos independentes dividindo o valor total
             const baseDate = new Date(date + 'T00:00:00');
-            const valorParcela = amount / installments; 
-            
+            // Cents-First: Cálculo em inteiros para evitar imprecisão de ponto flutuante
+            const totalCents = Math.round(amount * 100);
+            const installmentCents = Math.floor(totalCents / installments);
+            const remainderCents = totalCents % installments;
+
             for (let i = 0; i < installments; i++) {
                 const instDate = new Date(baseDate);
                 instDate.setMonth(instDate.getMonth() + i);
                 
+                // O último lançamento absorve os centavos de resto
+                const currentAmount = (i === installments - 1) 
+                    ? (installmentCents + remainderCents) / 100 
+                    : installmentCents / 100;
+
                 const instData = {
-                    id: Date.now().toString() + i, // ID único sequencial
+                    id: Date.now().toString() + "_" + i,
                     type, 
-                    amount: valorParcela, 
+                    amount: currentAmount, 
                     category, 
                     date: instDate.toISOString().split('T')[0], 
                     desc: `${desc} (${i + 1}/${installments})`, 
@@ -245,16 +249,14 @@ form.addEventListener('submit', function(e) {
                 newItemsToSync.push(instData);
             }
         } else {
-            // Única ou Recorrente (Removemos o bug que gerava o 2º mês fisicamente)
             const transactionData = { id: Date.now().toString(), type, amount, category, date, desc, isRecurring };
             transactions.push(transactionData);
             newItemsToSync.push(transactionData);
         }
     }
 
-    saveData(); // Salva localmente (agora sem o loop do Firebase)
+    saveData();
     
-    // Sincronização Cirúrgica no Firebase (apenas os itens novos/editados)
     if (typeof FirebaseModule !== 'undefined') {
         newItemsToSync.forEach(t => FirebaseModule.syncData('transactions', t));
     }
@@ -265,7 +267,6 @@ form.addEventListener('submit', function(e) {
     document.getElementById('trans-id').value = '';
     document.getElementById('trans-date').valueAsDate = new Date();
     
-    // Reseta visualmente o seletor de recorrência para evitar comportamento inesperado
     if (recurrenceSelect) {
         recurrenceSelect.value = 'unica';
         recurrenceSelect.dispatchEvent(new Event('change'));
@@ -281,14 +282,12 @@ categoryForm.addEventListener('submit', function(e) {
     
     if (formattedCat && !categories.includes(formattedCat)) {
         categories.push(formattedCat);
-        saveData(); // Salva local
+        saveData();
         
-        // Sincroniza a nova categoria com a nuvem
         if (typeof FirebaseModule !== 'undefined') {
             FirebaseModule.syncData('categories', { id: formattedCat, name: formattedCat });
         }
         
-        // Atualiza seletores no Form Principal e no módulo de Orçamento
         updateCategorySelect();
         if (typeof BudgetModule !== 'undefined') BudgetModule.updateCategoryOptions();
         
@@ -303,7 +302,6 @@ window.deleteTransaction = function(id) {
         transactions = transactions.filter(t => t.id !== id);
         saveData();
         
-        // Sincronização Firebase (Remoção)
         if (typeof FirebaseModule !== 'undefined') {
             FirebaseModule.deleteData('transactions', id);
         }
@@ -322,7 +320,6 @@ window.editTransaction = function(id) {
         document.getElementById('trans-date').value = trans.date;
         document.getElementById('trans-desc').value = trans.desc;
         
-        // Configuração segura do novo seletor no lugar do checkbox antigo
         if (recurrenceSelect) {
             recurrenceSelect.value = trans.isRecurring ? 'recorrente' : 'unica';
             recurrenceSelect.dispatchEvent(new Event('change'));
@@ -332,6 +329,26 @@ window.editTransaction = function(id) {
         
         showView('form');
         window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+};
+
+// Nova funcionalidade: Interrupção de Recorrência
+window.stopRecurrence = function(projId) {
+    const originalId = projId.split('_')[0];
+    const trans = transactions.find(t => t.id === originalId);
+    
+    if (trans && confirm(`Deseja interromper esta recorrência a partir do mês atual? (O histórico passado será mantido)`)) {
+        const picker = document.getElementById('extract-month-picker');
+        const [year, month] = picker.value.split('-');
+        
+        // Define que a recorrência termina no primeiro dia do mês selecionado no extrato
+        trans.recurrenceEndDate = `${year}-${month}-01`;
+        
+        saveData();
+        if (typeof FirebaseModule !== 'undefined') {
+            FirebaseModule.syncData('transactions', trans);
+        }
+        updateAllViews();
     }
 };
 
