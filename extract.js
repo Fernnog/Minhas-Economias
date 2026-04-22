@@ -28,15 +28,22 @@ const ExtractModule = (function() {
                 filtered.push(t);
             } 
             else if (t.isRecurring && (tYear < currentYear || (tYear === currentYear && tMonth < currentMonth))) {
+                const projDateStr = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
                 // Verificação de interrupção: Se existir data de término e o mês visualizado for posterior ou igual a ela, não projeta
                 if (t.recurrenceEndDate && new Date(currentYear, currentMonth, 1) >= new Date(t.recurrenceEndDate)) {
+                    return;
+                }
+
+                // Verificação de exceção: Não projeta se houver uma exceção registrada para esta data específica
+                if (t.skippedDates && t.skippedDates.includes(projDateStr)) {
                     return;
                 }
 
                 filtered.push({
                     ...t,
                     id: t.id + '_proj', 
-                    date: `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+                    date: projDateStr
                 });
             }
         });
@@ -77,6 +84,9 @@ const ExtractModule = (function() {
                                 <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="var(--danger)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
                             </button>
                             ` : `
+                            <button onclick="editSingleProjected('${t.id}', '${t.date}')" title="Editar apenas este mês">
+                                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                            </button>
                             <button onclick="stopRecurrence('${t.id}')" title="Parar Repetição" style="color: var(--danger);">
                                 <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"></line></svg>
                             </button>
