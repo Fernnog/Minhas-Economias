@@ -143,12 +143,10 @@ function updateDashboardData() {
     });
 
     todasTransacoes.forEach(trans => {
-        // Pula lançamentos com a categoria especial
-        if (trans.category === 'Sem Categoria') return; 
-
         const dataTrans = new Date(trans.date + 'T00:00:00'); 
         const isMesmoMes = dataTrans.getMonth() === mesAtual && dataTrans.getFullYear() === anoAtual;
         
+        // CÁLCULO DE SALDO: Lançamentos "Sem Categoria" agora afetam o saldo normalmente
         if (dataTrans <= hoje) {
             if (trans.type === 'receita') saldoAtualTotal += trans.amount;
             else saldoAtualTotal -= trans.amount;
@@ -159,7 +157,8 @@ function updateDashboardData() {
             else saldoFimMesTotal -= trans.amount;
         }
         
-        if (trans.type === 'despesa' && isMesmoMes) {
+        // GRÁFICO: Bloqueio isolado apenas para a renderização gerencial
+        if (trans.type === 'despesa' && isMesmoMes && trans.category.toLowerCase() !== 'sem categoria') {
             gastosPorCategoria[trans.category] = (gastosPorCategoria[trans.category] || 0) + trans.amount;
         }
     });
@@ -212,9 +211,17 @@ function renderCategoryChart(gastos) {
 
 function updateCategorySelect() {
     categorySelect.innerHTML = '';
-    // Filtra a especial para o final e ordena as outras
-    const regularCats = categories.filter(c => c !== 'Sem Categoria').sort();
-    [...regularCats, 'Sem Categoria'].forEach(cat => {
+    
+    // Sanitização: remove duplicatas exatas, espaços em branco e filtra variações da categoria especial
+    let uniqueCats = [...new Set(categories.map(c => c.trim()))];
+    const regularCats = uniqueCats.filter(c => c.toLowerCase() !== 'sem categoria').sort();
+    
+    // Atualiza o array global para refletir a limpeza (evita que o lixo volte do Firebase/LocalStorage)
+    categories = [...regularCats, 'Sem Categoria'];
+    saveData();
+    
+    // Monta o HTML do select
+    categories.forEach(cat => {
         const option = document.createElement('option');
         option.value = cat;
         option.innerText = cat;
