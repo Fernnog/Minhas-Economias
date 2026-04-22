@@ -34,17 +34,10 @@ const BudgetModule = (function() {
     function save() {
         const idField = document.getElementById('budget-id');
         const cat = document.getElementById('budget-category').value;
-        const amtInput = document.getElementById('budget-amount').value;
-        const amt = parseFloat(amtInput);
+        const amt = parseFloat(document.getElementById('budget-amount').value);
         const type = document.getElementById('budget-recurrence').value;
         const picker = document.getElementById('budget-month-picker');
         
-        // 1. Prevenção do erro NaN
-        if (isNaN(amt) || amt <= 0) {
-            alert("Por favor, insira um valor numérico válido para o orçamento.");
-            return;
-        }
-
         let currentMonth = new Date().getMonth() + 1;
         let currentYear = new Date().getFullYear();
         if (picker && picker.value) {
@@ -52,36 +45,20 @@ const BudgetModule = (function() {
         }
         const targetMonth = type === 'unico' ? `${currentYear}-${String(currentMonth).padStart(2, '0')}` : null;
 
-        let savedBudget;
-
         if (idField.value) {
             const idx = budgetLimits.findIndex(b => b.id === idField.value);
-            if(idx > -1) {
-                budgetLimits[idx] = { ...budgetLimits[idx], category: cat, amount: amt, type, targetMonth };
-                savedBudget = budgetLimits[idx];
-            }
+            if(idx > -1) budgetLimits[idx] = { ...budgetLimits[idx], category: cat, amount: amt, type, targetMonth };
             idField.value = '';
             document.getElementById('btn-save-budget').innerText = 'Definir Orçamento';
         } else {
-            // 2. Prevenção de duplicação: Verifica se já existe um orçamento para esta mesma categoria e contexto
-            const existingIdx = budgetLimits.findIndex(b => b.category === cat && b.type === type && b.targetMonth === targetMonth);
-            
-            if (existingIdx > -1) {
-                // Se já existe, atualiza o valor do existente em vez de criar um novo
-                budgetLimits[existingIdx] = { ...budgetLimits[existingIdx], amount: amt };
-                savedBudget = budgetLimits[existingIdx];
-            } else {
-                // Se não existe, cria normalmente
-                savedBudget = { id: Date.now().toString(), category: cat, amount: amt, type, targetMonth };
-                budgetLimits.push(savedBudget);
-            }
+            budgetLimits.push({ id: Date.now().toString(), category: cat, amount: amt, type, targetMonth });
         }
         
         localStorage.setItem('fin_budgets', JSON.stringify(budgetLimits));
         
-        // 3. Sincronização Firebase segura (usando o objeto exato salvo/atualizado)
-        if (typeof FirebaseModule !== 'undefined' && savedBudget) {
-            FirebaseModule.syncData('budgets', savedBudget);
+        // Sincronização Firebase
+        if (typeof FirebaseModule !== 'undefined') {
+            FirebaseModule.syncData('budgets', budgetLimits[budgetLimits.length - 1]);
         }
 
         document.getElementById('budget-form').reset();
@@ -136,30 +113,13 @@ const BudgetModule = (function() {
             monthCard.innerText = `${monthName.charAt(0).toUpperCase() + monthName.slice(1)} ${currentYear}`;
         }
 
-        // 4. Inteligência de varredura (incluindo despesas projetadas/recorrentes do mês todo)
-        const monthlyExpenses = {};
-
-        transactions.forEach(t => {
-            if (t.type !== 'despesa') return;
-
+        const monthlyExpenses = transactions.reduce((acc, t) => {
             const d = new Date(t.date + 'T00:00:00');
-            const tMonth = d.getMonth();
-            const tYear = d.getFullYear();
-
-            // Lançamentos do próprio mês
-            if (tMonth === currentMonth && tYear === currentYear) {
-                monthlyExpenses[t.category] = (monthlyExpenses[t.category] || 0) + t.amount;
-            } 
-            // Lançamentos projetados (recorrentes vindos de meses anteriores)
-            else if (t.isRecurring && (tYear < currentYear || (tYear === currentYear && tMonth < currentMonth))) {
-                const dataTermino = t.recurrenceEndDate ? new Date(t.recurrenceEndDate) : null;
-                const dataVisualizada = new Date(currentYear, currentMonth, 1);
-                
-                if (!dataTermino || dataVisualizada < dataTermino) {
-                    monthlyExpenses[t.category] = (monthlyExpenses[t.category] || 0) + t.amount;
-                }
+            if (t.type === 'despesa' && d.getMonth() === currentMonth && d.getFullYear() === currentYear) {
+                acc[t.category] = (acc[t.category] || 0) + t.amount;
             }
-        });
+            return acc;
+        }, {});
 
         const activeMonthStr = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}`;
         const activeBudgets = budgetLimits.filter(b => b.type === 'mensal' || b.targetMonth === activeMonthStr);

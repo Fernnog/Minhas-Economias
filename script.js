@@ -10,7 +10,6 @@ const categoryForm = document.getElementById('category-form');
 const recurrenceSelect = document.getElementById('trans-recurrence-type');
 const parcelasContainer = document.getElementById('parcelas-container');
 const amountInput = document.getElementById('trans-amount');
-const budgetAmountInput = document.getElementById('budget-amount'); // Prioridade 2: Elemento do Orçamento
 
 // Views
 const dashboardView = document.getElementById('dashboard-view');
@@ -27,24 +26,18 @@ if(recurrenceSelect) {
     });
 }
 
-// Máscara de moeda: Refatorada para função reutilizável (Clean Code)
-function applyCurrencyMask(e) {
-    let value = e.target.value.replace(/\D/g, ""); // Remove tudo que não é número
-    if (value === "") { e.target.value = ""; return; }
-    
-    value = (parseInt(value) / 100).toFixed(2) + "";
-    value = value.replace(".", ",");
-    value = value.replace(/(\d)(\d{3})(\d{3}),/g, "$1.$2.$3,");
-    value = value.replace(/(\d)(\d{3}),/g, "$1.$2,");
-    e.target.value = value;
-}
-
-// Aplica a máscara aos inputs
+// Máscara de moeda: formata o input conforme o usuário digita
 if (amountInput) {
-    amountInput.addEventListener('input', applyCurrencyMask);
-}
-if (budgetAmountInput) {
-    budgetAmountInput.addEventListener('input', applyCurrencyMask);
+    amountInput.addEventListener('input', function(e) {
+        let value = e.target.value.replace(/\D/g, ""); // Remove tudo que não é número
+        if (value === "") { e.target.value = ""; return; }
+        
+        value = (parseInt(value) / 100).toFixed(2) + "";
+        value = value.replace(".", ",");
+        value = value.replace(/(\d)(\d{3})(\d{3}),/g, "$1.$2.$3,");
+        value = value.replace(/(\d)(\d{3}),/g, "$1.$2,");
+        e.target.value = value;
+    });
 }
 
 // === INITIALIZATION ===
@@ -362,6 +355,7 @@ window.editTransaction = function(id) {
     }
 };
 
+// Nova funcionalidade: Interrupção de Recorrência
 window.stopRecurrence = function(projId) {
     const originalId = projId.split('_')[0];
     const trans = transactions.find(t => t.id === originalId);
@@ -370,6 +364,7 @@ window.stopRecurrence = function(projId) {
         const picker = document.getElementById('extract-month-picker');
         const [year, month] = picker.value.split('-');
         
+        // Define que a recorrência termina no primeiro dia do mês selecionado no extrato
         trans.recurrenceEndDate = `${year}-${month}-01`;
         
         saveData();
