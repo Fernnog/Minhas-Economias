@@ -36,7 +36,9 @@ const BudgetModule = (function() {
 
     function updateCategoryOptions() {
         const select = document.getElementById('budget-category');
-        select.innerHTML = categories.map(cat => `<option value="${cat}">${cat}</option>`).join('');
+        select.innerHTML = categories
+            .filter(cat => cat !== 'Sem Categoria') // Pula a categoria ignorada
+            .map(cat => `<option value="${cat}">${cat}</option>`).join('');
     }
 
     function save() {
