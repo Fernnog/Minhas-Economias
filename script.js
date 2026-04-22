@@ -136,6 +136,9 @@ function updateDashboardData() {
     });
 
     todasTransacoes.forEach(trans => {
+        // Pula lançamentos com a categoria especial
+        if (trans.category === 'Sem Categoria') return; 
+
         const dataTrans = new Date(trans.date + 'T00:00:00'); 
         const isMesmoMes = dataTrans.getMonth() === mesAtual && dataTrans.getFullYear() === anoAtual;
         
@@ -230,6 +233,9 @@ form.addEventListener('submit', function(e) {
     const isParcelada = (recurrenceType === 'parcelada');
     const installments = parseInt(document.getElementById('trans-installments')?.value || 1);
 
+    const exceptionParent = document.getElementById('trans-exception-parent')?.value;
+    const exceptionDate = document.getElementById('trans-exception-date')?.value;
+
     const newItemsToSync = [];
 
     if (id) {
@@ -268,6 +274,16 @@ form.addEventListener('submit', function(e) {
                 newItemsToSync.push(instData);
             }
         } else {
+            // Lógica de exceção de recorrência
+            if (exceptionParent) {
+                const parentTx = transactions.find(t => t.id === exceptionParent);
+                if (parentTx) {
+                    parentTx.skippedDates = parentTx.skippedDates || [];
+                    parentTx.skippedDates.push(exceptionDate);
+                    newItemsToSync.push(parentTx); // Atualiza o "pai" no Firebase
+                }
+            }
+
             const transactionData = { id: Date.now().toString(), type, amount, category, date, desc, isRecurring };
             transactions.push(transactionData);
             newItemsToSync.push(transactionData);
@@ -285,6 +301,11 @@ form.addEventListener('submit', function(e) {
     form.reset();
     document.getElementById('trans-id').value = '';
     document.getElementById('trans-date').valueAsDate = new Date();
+    
+    if(document.getElementById('trans-exception-parent')) {
+        document.getElementById('trans-exception-parent').value = '';
+        document.getElementById('trans-exception-date').value = '';
+    }
     
     if (recurrenceSelect) {
         recurrenceSelect.value = 'unica';
@@ -375,4 +396,33 @@ window.stopRecurrence = function(projId) {
     }
 };
 
+// Nova funcionalidade: Exceção Isolada de Recorrência
+window.editSingleProjected = function(projId, dateStr) {
+    const originalId = projId.replace('_proj', '');
+    const trans = transactions.find(t => t.id === originalId);
+    
+    if (trans) {
+        document.getElementById('trans-id').value = ''; 
+        document.getElementById('trans-exception-parent').value = trans.id;
+        document.getElementById('trans-exception-date').value = dateStr;
+
+        document.getElementById('trans-type').value = trans.type;
+        document.getElementById('trans-amount').value = trans.amount.toFixed(2).replace('.', ',');
+        document.getElementById('trans-category').value = trans.category;
+        document.getElementById('trans-date').value = dateStr; 
+        document.getElementById('trans-desc').value = trans.desc + ' (Exceção)';
+
+        const recurrenceSelect = document.getElementById('trans-recurrence-type');
+        if (recurrenceSelect) {
+            recurrenceSelect.value = 'unica';
+            recurrenceSelect.dispatchEvent(new Event('change'));
+        }
+
+        document.getElementById('btn-save').innerText = 'Salvar Exceção';
+        showView('form');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+};
+
 init();
+
