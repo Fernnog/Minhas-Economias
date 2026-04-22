@@ -161,7 +161,7 @@
                                 <label>Categoria</label>
                                 <select id="budget-category" required></select>
                                 <label>Meta de Gasto (R$)</label>
-                                <input type="text" id="budget-amount" inputmode="numeric" placeholder="0,00" required>
+                                <input type="number" id="budget-amount" step="0.01" placeholder="0,00" required>
                                 <label>Recorrência</label>
                                 <select id="budget-recurrence" required>
                                     <option value="mensal">Todos os meses (Recorrente)</option>
@@ -184,6 +184,18 @@
         </div>
 
     </main>
+
+    <dialog id="changelog-modal">
+        <div class="dialog-header">
+            <h3>Histórico de Evolução</h3>
+            <button class="close-dialog" onclick="document.getElementById('changelog-modal').close()">&times;</button>
+        </div>
+        <div id="changelog-content"></div>
+    </dialog>
+
+    <div id="version-card" class="version-badge" title="Clique para ver o histórico de alterações">
+        v<span id="app-version"></span>
+    </div>
 
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-auth-compat.js"></script>

@@ -29,22 +29,7 @@ if(recurrenceSelect) {
 // Máscara de moeda: formata o input conforme o usuário digita
 if (amountInput) {
     amountInput.addEventListener('input', function(e) {
-        let value = e.target.value.replace(/\D/g, ""); 
-        if (value === "") { e.target.value = ""; return; }
-        
-        value = (parseInt(value) / 100).toFixed(2) + "";
-        value = value.replace(".", ",");
-        value = value.replace(/(\d)(\d{3})(\d{3}),/g, "$1.$2.$3,");
-        value = value.replace(/(\d)(\d{3}),/g, "$1.$2,");
-        e.target.value = value;
-    });
-}
-
-// Máscara de moeda para o campo de Orçamento
-const budgetAmountInput = document.getElementById('budget-amount');
-if (budgetAmountInput) {
-    budgetAmountInput.addEventListener('input', function(e) {
-        let value = e.target.value.replace(/\D/g, ""); 
+        let value = e.target.value.replace(/\D/g, ""); // Remove tudo que não é número
         if (value === "") { e.target.value = ""; return; }
         
         value = (parseInt(value) / 100).toFixed(2) + "";
@@ -136,6 +121,7 @@ function updateDashboardData() {
 
         todasTransacoes.push(t); 
 
+        // Projeta se for recorrente e não tiver data de término ou se a projeção for anterior à data de término
         if (t.isRecurring && (tYear < anoAtual || (tYear === anoAtual && tMonth < mesAtual))) {
             const dataProjetada = new Date(anoAtual, mesAtual, d.getDate());
             const dataTermino = t.recurrenceEndDate ? new Date(t.recurrenceEndDate) : null;
@@ -230,6 +216,8 @@ form.addEventListener('submit', function(e) {
     
     const id = document.getElementById('trans-id').value;
     const type = document.getElementById('trans-type').value;
+    
+    // Tratamento exato do valor convertido da máscara visual
     const rawAmount = document.getElementById('trans-amount').value;
     const amount = parseFloat(rawAmount.replace(/\./g, '').replace(',', '.'));
     
@@ -253,6 +241,7 @@ form.addEventListener('submit', function(e) {
     } else {
         if (isParcelada) {
             const baseDate = new Date(date + 'T00:00:00');
+            // Cents-First: Cálculo em inteiros para evitar imprecisão de ponto flutuante
             const totalCents = Math.round(amount * 100);
             const installmentCents = Math.floor(totalCents / installments);
             const remainderCents = totalCents % installments;
@@ -261,6 +250,7 @@ form.addEventListener('submit', function(e) {
                 const instDate = new Date(baseDate);
                 instDate.setMonth(instDate.getMonth() + i);
                 
+                // O último lançamento absorve os centavos de resto
                 const currentAmount = (i === installments - 1) 
                     ? (installmentCents + remainderCents) / 100 
                     : installmentCents / 100;
@@ -344,8 +334,11 @@ window.editTransaction = function(id) {
     if (trans) {
         document.getElementById('trans-id').value = trans.id;
         document.getElementById('trans-type').value = trans.type;
+        
+        // Aplica a máscara inversa na hora de editar
         const formattedAmount = trans.amount.toFixed(2).replace('.', ',');
         document.getElementById('trans-amount').value = formattedAmount;
+        
         document.getElementById('trans-category').value = trans.category;
         document.getElementById('trans-date').value = trans.date;
         document.getElementById('trans-desc').value = trans.desc;
@@ -356,11 +349,13 @@ window.editTransaction = function(id) {
         }
         
         document.getElementById('btn-save').innerText = 'Atualizar Lançamento';
+        
         showView('form');
         window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 };
 
+// Nova funcionalidade: Interrupção de Recorrência
 window.stopRecurrence = function(projId) {
     const originalId = projId.split('_')[0];
     const trans = transactions.find(t => t.id === originalId);
@@ -368,6 +363,8 @@ window.stopRecurrence = function(projId) {
     if (trans && confirm(`Deseja interromper esta recorrência a partir do mês atual? (O histórico passado será mantido)`)) {
         const picker = document.getElementById('extract-month-picker');
         const [year, month] = picker.value.split('-');
+        
+        // Define que a recorrência termina no primeiro dia do mês selecionado no extrato
         trans.recurrenceEndDate = `${year}-${month}-01`;
         
         saveData();

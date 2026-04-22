@@ -28,18 +28,13 @@ const BudgetModule = (function() {
 
     function updateCategoryOptions() {
         const select = document.getElementById('budget-category');
-        if (!select) return;
         select.innerHTML = categories.map(cat => `<option value="${cat}">${cat}</option>`).join('');
     }
 
     function save() {
         const idField = document.getElementById('budget-id');
         const cat = document.getElementById('budget-category').value;
-        
-        // 1. Tratamento seguro do valor mascarado
-        const rawAmount = document.getElementById('budget-amount').value;
-        const amt = parseFloat(rawAmount.replace(/\./g, '').replace(',', '.'));
-        
+        const amt = parseFloat(document.getElementById('budget-amount').value);
         const type = document.getElementById('budget-recurrence').value;
         const picker = document.getElementById('budget-month-picker');
         
@@ -50,41 +45,23 @@ const BudgetModule = (function() {
         }
         const targetMonth = type === 'unico' ? `${currentYear}-${String(currentMonth).padStart(2, '0')}` : null;
 
-        // 2. Busca por duplicidade da mesma categoria neste ciclo
-        const existingIdx = budgetLimits.findIndex(b => 
-            b.category === cat && (b.type === type || b.targetMonth === targetMonth)
-        );
-
-        let updatedBudget;
-
         if (idField.value) {
-            // Edição manual de orçamento existente
             const idx = budgetLimits.findIndex(b => b.id === idField.value);
-            if(idx > -1) {
-                budgetLimits[idx] = { ...budgetLimits[idx], category: cat, amount: amt, type, targetMonth };
-                updatedBudget = budgetLimits[idx];
-            }
-        } else if (existingIdx > -1) {
-            // Fusão inteligente: Atualiza o existente ao invés de duplicar
-            budgetLimits[existingIdx].amount = amt;
-            updatedBudget = budgetLimits[existingIdx];
+            if(idx > -1) budgetLimits[idx] = { ...budgetLimits[idx], category: cat, amount: amt, type, targetMonth };
+            idField.value = '';
+            document.getElementById('btn-save-budget').innerText = 'Definir Orçamento';
         } else {
-            // Criação limpa
-            updatedBudget = { id: Date.now().toString(), category: cat, amount: amt, type, targetMonth };
-            budgetLimits.push(updatedBudget);
+            budgetLimits.push({ id: Date.now().toString(), category: cat, amount: amt, type, targetMonth });
         }
-        
-        idField.value = '';
-        document.getElementById('btn-save-budget').innerText = 'Definir Orçamento';
-        document.getElementById('budget-form').reset();
         
         localStorage.setItem('fin_budgets', JSON.stringify(budgetLimits));
         
-        // 3. Sincronização exata do objeto alterado para o Firebase
-        if (typeof FirebaseModule !== 'undefined' && updatedBudget) {
-            FirebaseModule.syncData('budgets', updatedBudget);
+        // Sincronização Firebase
+        if (typeof FirebaseModule !== 'undefined') {
+            FirebaseModule.syncData('budgets', budgetLimits[budgetLimits.length - 1]);
         }
 
+        document.getElementById('budget-form').reset();
         render();
     }
 
@@ -93,11 +70,7 @@ const BudgetModule = (function() {
         if(!b) return;
         document.getElementById('budget-id').value = b.id;
         document.getElementById('budget-category').value = b.category;
-        
-        // Aplica a máscara inversa na hora de editar
-        const formattedAmount = b.amount.toFixed(2).replace('.', ',');
-        document.getElementById('budget-amount').value = formattedAmount;
-        
+        document.getElementById('budget-amount').value = b.amount;
         document.getElementById('budget-recurrence').value = b.type;
         document.getElementById('btn-save-budget').innerText = 'Atualizar Orçamento';
         document.querySelector('.collapsible-card').setAttribute('open', 'true');
@@ -109,6 +82,7 @@ const BudgetModule = (function() {
             budgetLimits = budgetLimits.filter(x => x.id !== id);
             localStorage.setItem('fin_budgets', JSON.stringify(budgetLimits));
             
+            // Sincronização Firebase (Remoção)
             if (typeof FirebaseModule !== 'undefined') {
                 FirebaseModule.deleteData('budgets', id);
             }
@@ -120,7 +94,6 @@ const BudgetModule = (function() {
     function render() {
         const container = document.getElementById('budget-container');
         const picker = document.getElementById('budget-month-picker');
-        if (!container) return;
         
         let currentMonth = new Date().getMonth();
         let currentYear = new Date().getFullYear();
