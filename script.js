@@ -42,6 +42,13 @@ if (amountInput) {
 
 // === INITIALIZATION ===
 function init() {
+    // Injeção automática da categoria especial
+    if (!categories.includes('Sem Categoria')) {
+        categories.push('Sem Categoria');
+        saveData(); // Persiste no localStorage
+        console.log('✅ Categoria "Sem Categoria" injetada com sucesso.');
+    }
+
     if (typeof initChangelog === 'function') {
         initChangelog();
     }
@@ -205,7 +212,9 @@ function renderCategoryChart(gastos) {
 
 function updateCategorySelect() {
     categorySelect.innerHTML = '';
-    categories.sort().forEach(cat => {
+    // Filtra a especial para o final e ordena as outras
+    const regularCats = categories.filter(c => c !== 'Sem Categoria').sort();
+    [...regularCats, 'Sem Categoria'].forEach(cat => {
         const option = document.createElement('option');
         option.value = cat;
         option.innerText = cat;
@@ -425,4 +434,3 @@ window.editSingleProjected = function(projId, dateStr) {
 };
 
 init();
-
