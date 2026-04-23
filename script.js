@@ -62,6 +62,7 @@ if (amountInput) {
 // === INITIALIZATION ===
 function init() {
     // === Listeners de navegação (Prioridade de Registro) ===
+    // Movidos para o topo para evitar o travamento em "Carregando..."
     document.getElementById('btn-next-month')?.addEventListener('click', () => {
         if (dashboardMonthOffset < 1) {
             dashboardMonthOffset++;
