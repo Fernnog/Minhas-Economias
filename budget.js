@@ -6,7 +6,10 @@ const BudgetModule = (function() {
     if (rawBudgets && !Array.isArray(rawBudgets)) {
         budgetLimits = Object.entries(rawBudgets).map(([cat, amt]) => ({
             id: Date.now().toString() + Math.random().toString(36).substr(2, 5),
-            category: cat, amount: amt, type: 'mensal', targetMonth: null
+            category: cat, 
+            amount: amt, 
+            type: 'mensal', 
+            targetMonth: null
         }));
         localStorage.setItem('fin_budgets', JSON.stringify(budgetLimits));
     }
@@ -18,8 +21,10 @@ const BudgetModule = (function() {
 
     function init() {
         const form = document.getElementById('budget-form');
-        form.removeEventListener('submit', _handleSubmit);
-        form.addEventListener('submit', _handleSubmit);
+        if (form) {
+            form.removeEventListener('submit', _handleSubmit);
+            form.addEventListener('submit', _handleSubmit);
+        }
 
         const picker = document.getElementById('budget-month-picker');
         if (picker) {
@@ -31,6 +36,7 @@ const BudgetModule = (function() {
 
     function updateCategoryOptions() {
         const select = document.getElementById('budget-category');
+        if (!select) return;
         select.innerHTML = categories
             .filter(cat => cat !== 'Sem Categoria') 
             .map(cat => `<option value="${cat}">${cat}</option>`).join('');
@@ -53,6 +59,7 @@ const BudgetModule = (function() {
         if (picker && picker.value) {
             [currentYear, currentMonth] = picker.value.split('-');
         }
+        
         const targetMonth = type === 'unico'
             ? `${currentYear}-${String(currentMonth).padStart(2, '0')}`
             : null;
@@ -66,7 +73,8 @@ const BudgetModule = (function() {
                 itemToSync = budgetLimits[idx];
             }
             idField.value = '';
-            document.getElementById('btn-save-budget').innerText = 'Definir Orçamento';
+            const btnSave = document.getElementById('btn-save-budget');
+            if (btnSave) btnSave.innerText = 'Definir Orçamento';
         } else {
             const newBudget = { id: Date.now().toString(), category: cat, amount: amt, type, targetMonth };
             budgetLimits.push(newBudget);
@@ -90,8 +98,13 @@ const BudgetModule = (function() {
         document.getElementById('budget-category').value = b.category;
         document.getElementById('budget-amount').value = b.amount;
         document.getElementById('budget-recurrence').value = b.type;
-        document.getElementById('btn-save-budget').innerText = 'Atualizar Orçamento';
-        document.querySelector('.collapsible-card').setAttribute('open', 'true');
+        
+        const btnSave = document.getElementById('btn-save-budget');
+        if (btnSave) btnSave.innerText = 'Atualizar Orçamento';
+        
+        const collapsible = document.querySelector('.collapsible-card');
+        if (collapsible) collapsible.setAttribute('open', 'true');
+        
         window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
@@ -136,6 +149,7 @@ const BudgetModule = (function() {
             const d = new Date(t.date + 'T00:00:00');
             const tMonth = d.getMonth();
             const tYear = d.getFullYear();
+            
             if (tMonth === currentMonth && tYear === currentYear) {
                 monthlyExpenses[t.category] = (monthlyExpenses[t.category] || 0) + t.amount;
                 return;
@@ -151,7 +165,6 @@ const BudgetModule = (function() {
         });
 
         const activeMonthStr = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}`;
-
         const activeBudgets = budgetLimits.filter(b =>
             (b.type === 'mensal' || b.targetMonth === activeMonthStr) &&
             b.amount != null && !isNaN(b.amount)
@@ -159,46 +172,47 @@ const BudgetModule = (function() {
 
         const currentPinned = JSON.parse(localStorage.getItem('fin_pinned_budgets')) || [];
 
-        container.innerHTML = activeBudgets.map(budget => {
-            const spent = monthlyExpenses[budget.category] || 0;
-            const percent = Math.min((spent / budget.amount) * 100, 100);
-            const status = percent > 90 ? 'status-danger' : (percent > 70 ? 'status-warning' : 'status-ok');
-            const isPinned = currentPinned.includes(budget.category);
+        if (container) {
+            container.innerHTML = activeBudgets.map(budget => {
+                const spent = monthlyExpenses[budget.category] || 0;
+                const percent = Math.min((spent / budget.amount) * 100, 100);
+                const status = percent > 90 ? 'status-danger' : (percent > 70 ? 'status-warning' : 'status-ok');
+                const isPinned = currentPinned.includes(budget.category);
 
-            return `
-                <div class="budget-row">
-                    <div class="budget-meta-header">
-                        <div class="budget-meta-info">
-                            <strong>${budget.category} <small>${budget.type === 'mensal' ? '(Recorrente)' : '(Apenas este mês)'}</small></strong>
-                            <span style="font-size:0.9rem; font-weight:500;">R$ ${spent.toFixed(2)} / R$ ${budget.amount.toFixed(2)}</span>
+                return `
+                    <div class="budget-row">
+                        <div class="budget-meta-header">
+                            <div class="budget-meta-info">
+                                <strong>${budget.category} <small>${budget.type === 'mensal' ? '(Recorrente)' : '(Apenas este mês)'}</small></strong>
+                                <span style="font-size:0.9rem; font-weight:500;">R$ ${spent.toFixed(2)} / R$ ${budget.amount.toFixed(2)}</span>
+                            </div>
+                            <div class="actions">
+                                <button onclick="BudgetModule.togglePin('${budget.category}')" 
+                                        title="${isPinned ? 'Remover do Painel' : 'Fixar no Painel'}"
+                                        class="btn-pin ${isPinned ? 'pinned' : ''}">
+                                    <svg viewBox="0 0 24 24" width="16" height="16" fill="${isPinned ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+                                        <circle cx="12" cy="10" r="3"></circle>
+                                    </svg>
+                                </button>
+                                <button onclick="BudgetModule.edit('${budget.id}')" title="Editar"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg></button>
+                                <button onclick="BudgetModule.remove('${budget.id}')" title="Excluir"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="var(--danger)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg></button>
+                            </div>
                         </div>
-                        <div class="actions">
-                            <button onclick="BudgetModule.togglePin('${budget.category}')" 
-                                    title="${isPinned ? 'Remover do Painel' : 'Fixar no Painel'}"
-                                    class="btn-pin ${isPinned ? 'pinned' : ''}">
-                                <svg viewBox="0 0 24 24" width="16" height="16" fill="${isPinned ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                    <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
-                                    <circle cx="12" cy="10" r="3"></circle>
-                                </svg>
-                            </button>
-                            <button onclick="BudgetModule.edit('${budget.id}')" title="Editar"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg></button>
-                            <button onclick="BudgetModule.remove('${budget.id}')" title="Excluir"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="var(--danger)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg></button>
+                        <div class="progress-track">
+                            <div class="progress-fill ${status}" style="width: ${percent}%"></div>
                         </div>
                     </div>
-                    <div class="progress-track">
-                        <div class="progress-fill ${status}" style="width: ${percent}%"></div>
-                    </div>
-                </div>
-            `;
-        }).join('') || '<p class="text-light" style="text-align:center;">Nenhum orçamento definido para este mês.</p>';
+                `;
+            }).join('') || '<p class="text-light" style="text-align:center;">Nenhum orçamento definido para este mês.</p>';
+        }
 
-        // === RENDERIZAÇÃO DO CARD DE TOTAIS (REFATORADO COM REDUCE) ===
+        // === RENDERIZAÇÃO DO CARD DE TOTAIS (CONSOLIDAÇÃO COM REDUCE) ===
         const totalCard = document.getElementById('budget-total-card');
         if (totalCard) {
             if (activeBudgets.length === 0) {
                 totalCard.classList.add('hidden');
             } else {
-                // Soma total gasto e total orçado via reduce para maior precisão
                 const totalSpent = activeBudgets.reduce((acc, b) => acc + (monthlyExpenses[b.category] || 0), 0);
                 const totalBudgeted = activeBudgets.reduce((acc, b) => acc + b.amount, 0);
                 
@@ -268,5 +282,3 @@ const BudgetModule = (function() {
 
     return { init, render, edit, remove, updateCategoryOptions, loadFromStorage, togglePin };
 })();
-
-document.addEventListener('DOMContentLoaded', () => BudgetModule.init());
