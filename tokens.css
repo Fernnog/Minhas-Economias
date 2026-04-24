@@ -1,13 +1,16 @@
 /* =============================================
    DESIGN TOKENS — Motor Financeiro
+   Altere aqui para mudar o tema globalmente.
+   Não adicione regras de layout neste arquivo.
    ============================================= */
+
 :root {
     /* Fundos */
     --bg: #F5F1E9;
     --surface: #FAF7F2;
     --card: #FFFFFF;
 
-    /* Accent Principal */
+    /* Ouro — accent principal */
     --primary: #C9A84C;
     --primary-hover: #B8922F;
     --primary-dark: #8B6914;
