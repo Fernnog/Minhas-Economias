@@ -3,45 +3,8 @@ let transactions = JSON.parse(localStorage.getItem('fin_transactions')) || [];
 let categories = JSON.parse(localStorage.getItem('fin_categories')) || ['Alimentação', 'Moradia', 'Transporte', 'Salário', 'Lazer'];
 let pinnedBudgets = JSON.parse(localStorage.getItem('fin_pinned_budgets')) || [];
 
-/**
- * FUNÇÃO UTILITÁRIA GLOBAL — Fonte Única da Verdade para Gastos Mensais
- */
-window.getMonthExpenses = function(mesAlvo, anoAlvo) {
-    const expenses = {};
-    transactions.forEach(t => {
-        if (t.type !== 'despesa') return;
-        
-        // Correção: Adicionado guard contra undefined/null para evitar TypeError ao sincronizar dados
-        if (!t.category || t.category.toLowerCase() === 'sem categoria') return;
-
-        const d = new Date(t.date + 'T00:00:00');
-        const tMonth = d.getMonth();
-        const tYear = d.getFullYear();
-
-        // Lançamento direto no mês alvo
-        if (tYear === anoAlvo && tMonth === mesAlvo) {
-            const mesStr = `${anoAlvo}-${String(mesAlvo + 1).padStart(2, '0')}`;
-            if (t.skippedDates && t.skippedDates.some(sd => sd.startsWith(mesStr))) return;
-            expenses[t.category] = (expenses[t.category] || 0) + t.amount;
-            return;
-        }
-
-        // Recorrente: projeta para meses posteriores
-        if (t.isRecurring && (tYear < anoAlvo || (tYear === anoAlvo && tMonth < mesAlvo))) {
-            if (t.recurrenceEndDate) {
-                const fim = new Date(t.recurrenceEndDate);
-                if (new Date(anoAlvo, mesAlvo, 1) >= fim) return;
-            }
-            const mesStr = `${anoAlvo}-${String(mesAlvo + 1).padStart(2, '0')}`;
-            if (t.skippedDates && t.skippedDates.some(sd => sd.startsWith(mesStr))) return;
-            expenses[t.category] = (expenses[t.category] || 0) + t.amount;
-        }
-    });
-    return expenses;
-};
-
 // === NAVEGAÇÃO DE MÊS NO DASHBOARD ===
-let dashboardMonthOffset = 0; 
+let dashboardMonthOffset = 0; // 0 = mês atual, 1 = próximo mês
 
 // === TOAST NOTIFICATIONS SYSTEM ===
 window.showToast = function(message) {
@@ -53,9 +16,12 @@ window.showToast = function(message) {
     toast.innerText = message;
     
     container.appendChild(toast);
+    
+    // Força o reflow para garantir a animação de entrada
     void toast.offsetWidth;
     toast.classList.add('show');
     
+    // Remove o toast automaticamente após 3 segundos
     setTimeout(() => {
         toast.classList.remove('show');
         setTimeout(() => toast.remove(), 300);
@@ -71,17 +37,26 @@ const recurrenceSelect = document.getElementById('trans-recurrence-type');
 const parcelasContainer = document.getElementById('parcelas-container');
 const amountInput = document.getElementById('trans-amount');
 
+// Views
 const dashboardView = document.getElementById('dashboard-view');
 const managementView = document.getElementById('management-view');
 
+// === NOTIFICATION LOGIC ===
+
+/**
+ * Notifica o sistema sobre mudanças na lista de categorias,
+ * disparando a persistência e a atualização de todos os componentes dependentes.
+ */
 function notifyCategoryChange() {
     saveData();
     updateCategorySelect();
+    
     if (typeof BudgetModule !== 'undefined' && typeof BudgetModule.updateCategoryOptions === 'function') {
         BudgetModule.updateCategoryOptions();
     }
 }
 
+// Logic for Recurrence UI
 if(recurrenceSelect) {
     recurrenceSelect.addEventListener('change', (e) => {
         if(e.target.value === 'parcelada') {
@@ -92,10 +67,12 @@ if(recurrenceSelect) {
     });
 }
 
+// Máscara de moeda
 if (amountInput) {
     amountInput.addEventListener('input', function(e) {
         let value = e.target.value.replace(/\D/g, "");
         if (value === "") { e.target.value = ""; return; }
+        
         value = (parseInt(value) / 100).toFixed(2) + "";
         value = value.replace(".", ",");
         value = value.replace(/(\d)(\d{3})(\d{3}),/g, "$1.$2.$3,");
@@ -104,9 +81,15 @@ if (amountInput) {
     });
 }
 
+// === INITIALIZATION ===
 function init() {
+    // === Listeners de Navegação e Modais ===
+    
+    // Fechamento de dialogs pelo backdrop (Melhoria Global de UX)
     document.querySelectorAll('dialog').forEach(d => {
-        d.addEventListener('click', e => { if (e.target === d) d.close(); });
+        d.addEventListener('click', e => { 
+            if (e.target === d) d.close(); 
+        });
     });
 
     document.getElementById('btn-next-month')?.addEventListener('click', () => {
@@ -123,12 +106,16 @@ function init() {
         }
     });
 
+    // Garante a existência da categoria de fallback
     if (!categories.includes('Sem Categoria')) {
         categories.push('Sem Categoria');
         notifyCategoryChange();
+        console.log('✅ Categoria "Sem Categoria" injetada com sucesso.');
     }
 
-    if (typeof initChangelog === 'function') initChangelog();
+    if (typeof initChangelog === 'function') {
+        initChangelog();
+    }
     
     const headerDate = document.getElementById('header-date');
     if (headerDate) headerDate.innerText = new Date().toLocaleDateString('pt-BR');
@@ -137,12 +124,16 @@ function init() {
     if (transDate) transDate.valueAsDate = new Date();
     
     updateCategorySelect();
+    
     if (typeof ExtractModule !== 'undefined') ExtractModule.init();
     if (typeof BudgetModule !== 'undefined') BudgetModule.init();
     
     updateAllViews();
+    
+    console.log('%cMotor Financeiro Iniciado', 'color: #2e7d32; font-weight: bold; font-size: 14px;');
 }
 
+// === ROUTING (SPA) ===
 window.showDashboard = function() {
     managementView.classList.add('hidden');
     dashboardView.classList.remove('hidden');
@@ -153,7 +144,9 @@ window.showView = function(targetView) {
     dashboardView.classList.add('hidden');
     managementView.classList.remove('hidden');
     
+    // Removida a 'view-settings' da lista de subViews conforme o plano de evolução
     const subViews = ['view-form', 'view-extract', 'view-budget', 'view-charts'];
+    
     subViews.forEach(viewId => {
         const viewEl = document.getElementById(viewId);
         if (viewEl) viewEl.classList.add('hidden');
@@ -161,12 +154,24 @@ window.showView = function(targetView) {
     
     const targetId = `view-${targetView}`;
     const targetEl = document.getElementById(targetId);
-    if (targetEl) targetEl.classList.remove('hidden');
     
-    if (targetView === 'budget' && typeof BudgetModule !== 'undefined') BudgetModule.render();
-    if (targetView === 'charts') updateDashboardData(); 
+    if (targetEl) {
+        targetEl.classList.remove('hidden');
+    }
+    
+    const gridLayout = document.querySelector('#management-view .grid-layout');
+    if (gridLayout) gridLayout.style.gridTemplateColumns = '1fr';
+    
+    if (targetView === 'budget' && typeof BudgetModule !== 'undefined') {
+        BudgetModule.render();
+    }
+    
+    if (targetView === 'charts') {
+        updateDashboardData(); 
+    }
 };
 
+// === LOGIC & CALCULATIONS ===
 function saveData() {
     localStorage.setItem('fin_transactions', JSON.stringify(transactions));
     localStorage.setItem('fin_categories', JSON.stringify(categories));
@@ -187,18 +192,6 @@ function updateDashboardData() {
     const anoAtual = dataVisualizada.getFullYear();
     const isMesCorrente = dashboardMonthOffset === 0;
 
-    // --- Feedback Visual (Animação) ---
-    const animatableCards = [
-        document.getElementById('card-saldo-atual'),
-        document.getElementById('card-saldo-mes')
-    ].filter(Boolean);
-
-    animatableCards.forEach(card => {
-        card.classList.remove('card-animating');
-        void card.offsetWidth; 
-        card.classList.add('card-animating');
-    });
-
     const monthLabel = document.getElementById('dashboard-month-label');
     if (monthLabel) {
         const nomeMes = dataVisualizada.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
@@ -211,19 +204,23 @@ function updateDashboardData() {
     if (btnNext) btnNext.disabled = dashboardMonthOffset >= 1;
 
     const cardAtualEl = document.getElementById('card-saldo-atual');
-    if (cardAtualEl) isMesCorrente ? cardAtualEl.classList.remove('hidden') : cardAtualEl.classList.add('hidden');
+    if (cardAtualEl) {
+        isMesCorrente ? cardAtualEl.classList.remove('hidden') : cardAtualEl.classList.add('hidden');
+    }
 
     const cardSaldoMesLabel = document.getElementById('card-saldo-mes-label');
     const cardMesEl = document.getElementById('card-saldo-mes');
-    if (cardSaldoMesLabel) cardSaldoMesLabel.textContent = isMesCorrente ? 'Projeção Final do Mês' : 'Saldo Final Previsto';
-    if (cardMesEl) isMesCorrente ? cardMesEl.classList.remove('future-month') : cardMesEl.classList.add('future-month');
+    if (cardSaldoMesLabel) {
+        cardSaldoMesLabel.textContent = isMesCorrente ? 'Projeção Final do Mês' : 'Saldo Final Previsto';
+    }
+    if (cardMesEl) {
+        isMesCorrente ? cardMesEl.classList.remove('future-month') : cardMesEl.classList.add('future-month');
+    }
 
     let saldoAtualTotal = 0;
     let saldoFimMesTotal = 0;
+    const gastosPorCategoria = {};
     const todasTransacoes = [];
-
-    // Refatoração para usar a função global de gastos
-    const gastosPorCategoria = getMonthExpenses(mesAtual, anoAtual);
 
     transactions.forEach(t => {
         const d = new Date(t.date + 'T00:00:00');
@@ -256,6 +253,10 @@ function updateDashboardData() {
             if (trans.type === 'receita') saldoFimMesTotal += trans.amount;
             else saldoFimMesTotal -= trans.amount;
         }
+
+        if (trans.type === 'despesa' && isMesmoMes && trans.category.toLowerCase() !== 'sem categoria') {
+            gastosPorCategoria[trans.category] = (gastosPorCategoria[trans.category] || 0) + trans.amount;
+        }
     });
 
     const saldoAtualDisplay = document.getElementById('saldo-atual-display');
@@ -273,6 +274,7 @@ function updateDashboardData() {
 function renderCategoryChart(gastos) {
     const chartContainer = document.getElementById('category-chart');
     if (!chartContainer) return;
+
     chartContainer.innerHTML = '';
     
     const categorias = Object.keys(gastos);
@@ -282,14 +284,18 @@ function renderCategoryChart(gastos) {
     }
 
     const maxGasto = Math.max(...Object.values(gastos));
+
     categorias.sort((a, b) => gastos[b] - gastos[a]).forEach(cat => {
         const valor = gastos[cat];
         const percentual = (valor / maxGasto) * 100;
+        
         const row = document.createElement('div');
         row.className = 'bar-row';
         row.innerHTML = `
             <div class="bar-label" title="${cat}">${cat}</div>
-            <div class="bar-track"><div class="bar-fill" style="width: 0%;" data-target-width="${percentual}%"></div></div>
+            <div class="bar-track">
+                <div class="bar-fill" style="width: 0%;" data-target-width="${percentual}%"></div>
+            </div>
             <div class="bar-value">${valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</div>
         `;
         chartContainer.appendChild(row);
@@ -305,9 +311,12 @@ function renderCategoryChart(gastos) {
 function updateCategorySelect() {
     if (!categorySelect) return;
     categorySelect.innerHTML = '';
+    
     let uniqueCats = [...new Set(categories.map(c => c.trim()))];
     const regularCats = uniqueCats.filter(c => c.toLowerCase() !== 'sem category' && c.toLowerCase() !== 'sem categoria').sort();
+    
     categories = [...regularCats, 'Sem Categoria'];
+    
     categories.forEach(cat => {
         const option = document.createElement('option');
         option.value = cat;
@@ -319,41 +328,62 @@ function updateCategorySelect() {
 categoryForm?.addEventListener('submit', function(e) {
     e.preventDefault();
     const newCatInput = document.getElementById('new-category');
-    const newCatName = newCatInput?.value.trim();
+    if (!newCatInput) return;
+
+    const newCatName = newCatInput.value.trim();
     if (!newCatName) return;
-    if (categories.some(c => c.toLowerCase() === newCatName.toLowerCase())) {
+
+    const isDuplicate = categories.some(c => c.toLowerCase() === newCatName.toLowerCase());
+    if (isDuplicate) {
         alert(`A categoria "${newCatName}" já existe.`);
         return;
     }
+
     categories.push(newCatName);
     notifyCategoryChange();
+
     newCatInput.value = '';
+    newCatInput.placeholder = `✅ "${newCatName}" adicionada!`;
+    setTimeout(() => { newCatInput.placeholder = 'Nome da categoria...'; }, 2500);
 });
 
 function renderPinnedBudgets(gastosDoMes, mesAtual, anoAtual) {
     const container = document.getElementById('pinned-budgets-container');
     if (!container) return;
+
     if (mesAtual === undefined) mesAtual = new Date().getMonth();
     if (anoAtual === undefined) anoAtual = new Date().getFullYear();
 
     const rawBudgets = JSON.parse(localStorage.getItem('fin_budgets')) || [];
+
     if (pinnedBudgets.length === 0) {
-        container.innerHTML = '<p style="color: var(--text-light); font-size: 0.9rem; width: 100%; text-align: center; padding: 1rem;">Nenhum orçamento fixado.</p>';
+        container.innerHTML = '<p style="color: var(--text-light); font-size: 0.9rem; width: 100%; text-align: center; padding: 1rem;">Nenhum orçamento fixado. Use a engrenagem para configurar.</p>';
         return;
     }
 
     const currentYearMonth = `${anoAtual}-${String(mesAtual + 1).padStart(2, '0')}`;
+
     container.innerHTML = pinnedBudgets.map(cat => {
-        const budget = rawBudgets.find(b => b.category === cat && (b.type === 'mensal' || b.targetMonth === currentYearMonth));
+        const budget = rawBudgets.find(b =>
+            b.category === cat &&
+            (b.type === 'mensal' || b.targetMonth === currentYearMonth)
+        );
         const spent = gastosDoMes[cat] || 0;
         const limit = budget ? budget.amount : 0;
         const percent = limit > 0 ? Math.min((spent / limit) * 100, 100) : (spent > 0 ? 100 : 0);
-        const status = limit > 0 ? (percent > 90 ? 'status-danger' : (percent > 70 ? 'status-warning' : 'status-ok')) : 'status-danger';
+        let status = 'status-ok';
+        if (limit > 0) {
+            status = percent > 90 ? 'status-danger' : (percent > 70 ? 'status-warning' : 'status-ok');
+        } else if (spent > 0) {
+            status = 'status-danger';
+        }
         return `
             <div class="pinned-card">
                 <div class="pinned-card-header">
-                    <span>${cat}</span>
-                    <small>${spent.toLocaleString('pt-BR', {style: 'currency', currency: 'BRL'})} / ${limit > 0 ? limit.toLocaleString('pt-BR', {style: 'currency', currency: 'BRL'}) : 'Sem Meta'}</small>
+                    <span style="display: block;">${cat}</span>
+                    <span style="font-size: 0.8rem; color: var(--text-light);">
+                        ${spent.toLocaleString('pt-BR', {style: 'currency', currency: 'BRL'})} / ${limit > 0 ? limit.toLocaleString('pt-BR', {style: 'currency', currency: 'BRL'}) : 'Sem Meta'}
+                    </span>
                 </div>
                 <div class="progress-track" style="height: 8px; background: var(--border); border-radius: 4px; overflow: hidden;">
                     <div class="progress-fill ${status}" style="width: ${percent}%; height: 100%; transition: width 0.5s ease;"></div>
@@ -363,8 +393,10 @@ function renderPinnedBudgets(gastosDoMes, mesAtual, anoAtual) {
     }).join('');
 }
 
+// === EVENT HANDLERS ===
 form.addEventListener('submit', function(e) {
     e.preventDefault();
+    
     const id = document.getElementById('trans-id').value;
     const type = document.getElementById('trans-type').value;
     const rawAmount = document.getElementById('trans-amount').value;
@@ -372,10 +404,14 @@ form.addEventListener('submit', function(e) {
     const category = document.getElementById('trans-category').value;
     const date = document.getElementById('trans-date').value;
     const desc = document.getElementById('trans-desc').value;
-    const recurrenceType = document.getElementById('trans-recurrence-type')?.value || 'unica';
+    const recurrenceType = document.getElementById('trans-recurrence-type') ? document.getElementById('trans-recurrence-type').value : 'unica';
     const isRecurring = (recurrenceType === 'recorrente');
     const isParcelada = (recurrenceType === 'parcelada');
     const installments = parseInt(document.getElementById('trans-installments')?.value || 1);
+
+    const exceptionParent = document.getElementById('trans-exception-parent')?.value;
+    const exceptionDate = document.getElementById('trans-exception-date')?.value;
+
     const newItemsToSync = [];
 
     if (id) {
@@ -383,33 +419,75 @@ form.addEventListener('submit', function(e) {
         const index = transactions.findIndex(t => t.id === id);
         transactions[index] = transactionData;
         newItemsToSync.push(transactionData);
+        document.getElementById('btn-save').innerText = 'Salvar Lançamento';
     } else {
         if (isParcelada) {
             const baseDate = new Date(date + 'T00:00:00');
             const totalCents = Math.round(amount * 100);
             const installmentCents = Math.floor(totalCents / installments);
             const remainderCents = totalCents % installments;
+
             for (let i = 0; i < installments; i++) {
                 const instDate = new Date(baseDate);
                 instDate.setMonth(instDate.getMonth() + i);
-                const currentAmount = (i === installments - 1) ? (installmentCents + remainderCents) / 100 : installmentCents / 100;
-                const instData = { id: Date.now().toString() + "_" + i, type, amount: currentAmount, category, date: instDate.toISOString().split('T')[0], desc: `${desc} (${i + 1}/${installments})`, isRecurring: false };
+                const currentAmount = (i === installments - 1) 
+                    ? (installmentCents + remainderCents) / 100 
+                    : installmentCents / 100;
+
+                const instData = {
+                    id: Date.now().toString() + "_" + i,
+                    type, 
+                    amount: currentAmount, 
+                    category, 
+                    date: instDate.toISOString().split('T')[0], 
+                    desc: `${desc} (${i + 1}/${installments})`, 
+                    isRecurring: false
+                };
                 transactions.push(instData);
                 newItemsToSync.push(instData);
             }
         } else {
-            const transactionData = { id: Date.now().toString(), type, amount, category, date, desc, isRecurring };
-            transactions.push(transactionData);
-            newItemsToSync.push(transactionData);
+            if (exceptionParent) {
+                const parentTx = transactions.find(t => t.id === exceptionParent);
+                const editScope = document.getElementById('trans-edit-scope')?.value;
+
+                if (parentTx) {
+                    if (editScope === 'this_and_future') {
+                        parentTx.recurrenceEndDate = exceptionDate;
+                        newItemsToSync.push(parentTx);
+                        const transactionData = { id: Date.now().toString(), type, amount, category, date, desc, isRecurring: true };
+                        transactions.push(transactionData);
+                        newItemsToSync.push(transactionData);
+                    } else {
+                        parentTx.skippedDates = parentTx.skippedDates || [];
+                        parentTx.skippedDates.push(exceptionDate);
+                        newItemsToSync.push(parentTx);
+                        const transactionData = { id: Date.now().toString(), type, amount, category, date, desc, isRecurring: false };
+                        transactions.push(transactionData);
+                        newItemsToSync.push(transactionData);
+                    }
+                }
+            } else {
+                const transactionData = { id: Date.now().toString(), type, amount, category, date, desc, isRecurring };
+                transactions.push(transactionData);
+                newItemsToSync.push(transactionData);
+            }
         }
     }
 
     saveData();
-    if (typeof FirebaseModule !== 'undefined') newItemsToSync.forEach(t => FirebaseModule.syncData('transactions', t));
+    if (typeof FirebaseModule !== 'undefined') {
+        newItemsToSync.forEach(t => FirebaseModule.syncData('transactions', t));
+    }
     updateAllViews();
     form.reset();
     document.getElementById('trans-id').value = '';
-    showToast(id ? 'Lançamento atualizado!' : 'Novo lançamento salvo!');
+    const transDateInput = document.getElementById('trans-date');
+    if (transDateInput) transDateInput.valueAsDate = new Date();
+    
+    // Injeção da notificação de sucesso para lançamentos
+    showToast(id ? 'Lançamento atualizado com sucesso!' : 'Novo lançamento salvo!');
+    
     showDashboard();
 });
 
@@ -419,7 +497,53 @@ window.deleteTransaction = function(id) {
         saveData();
         if (typeof FirebaseModule !== 'undefined') FirebaseModule.deleteData('transactions', id);
         updateAllViews();
-        showToast('Lançamento excluído!');
+        
+        // Injeção da notificação de sucesso para exclusão
+        showToast('Lançamento excluído com sucesso!');
+    }
+};
+
+// Edita uma projeção específica de uma recorrência
+window.editSingleProjected = function(id, date) {
+    const parentId = id.replace('_proj', '');
+    const parentTx = transactions.find(t => t.id === parentId);
+    if (!parentTx) return;
+
+    // Prepara o formulário para registrar uma exceção
+    document.getElementById('trans-id').value = ''; 
+    document.getElementById('trans-exception-parent').value = parentId;
+    document.getElementById('trans-exception-date').value = date;
+
+    document.getElementById('trans-type').value = parentTx.type;
+    document.getElementById('trans-amount').value = parentTx.amount.toFixed(2).replace('.', ',');
+    document.getElementById('trans-category').value = parentTx.category;
+    document.getElementById('trans-date').value = date;
+    document.getElementById('trans-desc').value = parentTx.desc;
+
+    document.getElementById('trans-recurrence-type').value = 'unica';
+    
+    // Exibe a opção de escopo (apenas este mês vs. este e futuros)
+    const scopeContainer = document.getElementById('edit-scope-container');
+    if (scopeContainer) scopeContainer.classList.remove('hidden');
+
+    document.getElementById('btn-save').innerText = 'Salvar Alteração';
+    showView('form');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+};
+
+// Interrompe uma repetição infinita a partir do mês selecionado
+window.stopRecurrence = function(id, date) {
+    const parentId = id.replace('_proj', '');
+    if (confirm('Deseja interromper esta repetição a partir deste mês? Todos os lançamentos futuros serão cancelados.')) {
+        const parentTx = transactions.find(t => t.id === parentId);
+        if (parentTx) {
+            parentTx.recurrenceEndDate = date;
+            saveData();
+            if (typeof FirebaseModule !== 'undefined') {
+                FirebaseModule.syncData('transactions', parentTx);
+            }
+            updateAllViews();
+        }
     }
 };
 
@@ -428,7 +552,8 @@ window.editTransaction = function(id) {
     if (trans) {
         document.getElementById('trans-id').value = trans.id;
         document.getElementById('trans-type').value = trans.type;
-        document.getElementById('trans-amount').value = trans.amount.toFixed(2).replace('.', ',');
+        const formattedAmount = trans.amount.toFixed(2).replace('.', ',');
+        document.getElementById('trans-amount').value = formattedAmount;
         document.getElementById('trans-category').value = trans.category;
         document.getElementById('trans-date').value = trans.date;
         document.getElementById('trans-desc').value = trans.desc;
@@ -438,6 +563,7 @@ window.editTransaction = function(id) {
         }
         document.getElementById('btn-save').innerText = 'Atualizar Lançamento';
         showView('form');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 };
 
@@ -445,6 +571,8 @@ init();
 
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js').catch(err => console.error('❌ SW:', err));
+        navigator.serviceWorker.register('./sw.js')
+            .then(reg => console.log('✅ Service Worker registado'))
+            .catch(err => console.error('❌ Falha Service Worker:', err));
     });
 }
