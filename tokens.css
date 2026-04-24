@@ -1,0 +1,26 @@
+/* =============================================
+   DESIGN TOKENS — Motor Financeiro
+   ============================================= */
+:root {
+    /* Fundos */
+    --bg: #F5F1E9;
+    --surface: #FAF7F2;
+    --card: #FFFFFF;
+
+    /* Accent Principal */
+    --primary: #C9A84C;
+    --primary-hover: #B8922F;
+    --primary-dark: #8B6914;
+
+    /* Semânticas */
+    --success: #4CAF7C;
+    --danger: #E05252;
+    --warning: #D4A450;
+
+    /* Texto */
+    --text: #1C1A17;
+    --text-light: #6B6150;
+
+    /* Bordas */
+    --border: rgba(201, 168, 76, 0.22);
+}
