@@ -1,7 +1,7 @@
 // === ARQUIVO: sw.js ===
 
 // Versão do cache: Atualizada para v2 para aplicar as novas regras de bypass
-const CACHE_NAME = 'fin-cache-v2'; 
+const CACHE_NAME = 'fin-cache-v3';
 
 // Lista de arquivos vitais que o navegador vai salvar no celular para funcionar offline
 const ASSETS_TO_CACHE = [
