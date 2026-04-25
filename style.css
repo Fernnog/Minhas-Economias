@@ -202,51 +202,37 @@ main { padding: 2rem; flex: 1; max-width: 1200px; margin: 0 auto; width: 100%; }
 .horizontal-scroll::-webkit-scrollbar { height: 6px; }
 .horizontal-scroll::-webkit-scrollbar-thumb { background-color: var(--border); border-radius: 4px; }
 
-/* === PINNED BUDGET CARDS — Dashboard === */
 .pinned-card {
-    background: var(--card);              /* Fundo branco — card limpo */
-    min-width: 200px;
-    max-width: 260px;
-    padding: 1rem 1.1rem 1rem;
+    background: linear-gradient(145deg, #1C1A17 0%, #252118 100%);
+    border: 1px solid rgba(201, 168, 76, 0.4);
+    min-width: 240px;
+    padding: 1.2rem;
     border-radius: 12px;
-    border: 1px solid var(--border);
     scroll-snap-align: center;
-    box-shadow: 0 2px 8px rgba(201, 168, 76, 0.08);
-    display: flex;
-    flex-direction: column;
-    gap: 0.6rem;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
 }
 
-/* Chip do nome da categoria — fundo preto, texto dourado */
-.pinned-category-chip {
-    display: inline-block;
-    background: var(--text);              /* Quase-preto aquecido (#1C1A17) */
-    color: var(--primary);               /* Ouro Imperial */
-    font-size: 0.82rem;
-    font-weight: 700;
-    letter-spacing: 0.03em;
-    padding: 0.3rem 0.7rem;
-    border-radius: 20px;
-    /* SEM overflow hidden, SEM text-overflow, SEM white-space nowrap */
-    word-break: break-word;              /* Quebra o nome se necessário */
-    line-height: 1.4;
-    max-width: 100%;
-}
-
-/* Valores gastos/limite */
-.pinned-card-values {
-    font-size: 0.88rem;
-    font-weight: 600;
-    color: var(--text);
-    line-height: 1.3;
-}
-
-/* Mantém compatibilidade com código legado que usa .pinned-card-header */
 .pinned-card-header {
     display: flex;
-    flex-direction: column;
-    gap: 0.35rem;
-    margin-bottom: 0;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.8rem;
+    font-weight: 600;
+    font-size: 0.95rem;
+    gap: 0.8rem; /* Espaçamento essencial para desgrudar a categoria do valor */
+}
+
+.pinned-card-header span:first-child {
+    color: var(--primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.pinned-card-header span:last-child {
+    color: rgba(201, 168, 76, 0.8) !important;
+    white-space: nowrap;
+    text-align: right;
 }
 
 /* Menu de Ações (Bottom) */
@@ -1079,6 +1065,4 @@ button.btn-voltar.btn-dark-gold {
     padding: 0.6rem 1rem;
     border-radius: 8px;
     color: var(--primary);
-}
-
 }
