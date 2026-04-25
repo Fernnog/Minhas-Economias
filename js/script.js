@@ -402,18 +402,16 @@ function renderPinnedBudgets(gastosDoMes, mesAtual, anoAtual) {
             status = 'status-danger';
         }
         
+        // NOVO: Estrutura HTML com Chip de Categoria e Valor Separado
         return `
             <div class="pinned-card">
-                <span class="pinned-category-chip">${cat}</span>
-                <div class="pinned-card-values">
-                    ${spent.toLocaleString('pt-BR', {style: 'currency', currency: 'BRL'})}
-                    <span style="color: var(--text-light); font-weight: 400;"> / </span>
-                    ${limit > 0
-                        ? limit.toLocaleString('pt-BR', {style: 'currency', currency: 'BRL'})
-                        : '<span style="color:var(--text-light); font-weight:400;">Sem Meta</span>'
-                    }
+                <div class="pinned-card-header">
+                    <span class="pinned-category-chip">${cat}</span>
+                    <span class="pinned-card-value">
+                        ${spent.toLocaleString('pt-BR', {style: 'currency', currency: 'BRL'})} / ${limit > 0 ? limit.toLocaleString('pt-BR', {style: 'currency', currency: 'BRL'}) : 'Sem Meta'}
+                    </span>
                 </div>
-                <div class="progress-track" style="height: 6px; background: var(--border); border-radius: 4px; overflow: hidden;">
+                <div class="progress-track" style="height: 8px; background: var(--border); border-radius: 4px; overflow: hidden;">
                     <div class="progress-fill ${status}" style="width: ${percent}%; height: 100%; transition: width 0.5s ease;"></div>
                 </div>
             </div>
@@ -594,6 +592,4 @@ if ('serviceWorker' in navigator) {
             .then(reg => console.log('✅ Service Worker registado'))
             .catch(err => console.error('❌ Falha Service Worker:', err));
     });
-}
-
 }
