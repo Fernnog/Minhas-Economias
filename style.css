@@ -370,9 +370,18 @@ main { padding: 2rem; flex: 1; max-width: 1200px; margin: 0 auto; width: 100%; }
 
 /* === GERENCIAMENTO VIEW === */
 #management-view .grid-layout {
-    display: grid; 
-    grid-template-columns: 320px 1fr; 
+    display: flex; 
+    flex-direction: column; 
     gap: 2rem; 
+    max-width: 1000px; /* Expande graciosamente, mas evita distorção em telas Ultra-Wide */
+    margin: 0 auto; /* Centraliza o conteúdo na tela */
+    width: 100%;
+}
+
+#view-form {
+    max-width: 500px; /* Formulários não devem esticar na tela toda */
+    margin: 0 auto; /* Centraliza o formulário no meio da tela do PC */
+    width: 100%;
 }
 
 .nav-bar {
@@ -627,7 +636,7 @@ dialog::backdrop { background: rgba(15, 23, 42, 0.5); backdrop-filter: blur(4px)
 
 @media (max-width: 900px) {
     .dashboard-header { grid-template-columns: 1fr; }
-    #management-view .grid-layout { grid-template-columns: 1fr; }
+    /* A trava antiga do .grid-layout foi removida daqui, pois o Flexbox acima já é nativamente responsivo */
 }
 
 /* --- BARRAS DE PROGRESSO DO ORÇAMENTO --- */
