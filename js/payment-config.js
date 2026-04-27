@@ -33,12 +33,12 @@ window.PAYMENT_CONFIG = {
               </svg>`
     },
     'cartao1': {
-        value: 'cartao1',
-        label: 'Cartão 1',
-        title: 'Cartão 1',
+        value: 'cartao1', // MANTIDO: Garante que os lançamentos antigos continuem funcionando
+        label: 'Passaí',  // NOVO NOME DE EXIBIÇÃO
+        title: 'Cartão Passaí',
         clsToggle:  'chip-state-cartao1',
         clsExtract: 'chip-cartao1',
-        color: '#059669',
+        color: '#059669', // Verde (você pode alterar para a cor da marca se desejar)
         svg: `<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                 <rect x="1" y="4" width="22" height="16" rx="2"></rect>
                 <line x1="1" y1="10" x2="23" y2="10"></line>
@@ -46,12 +46,12 @@ window.PAYMENT_CONFIG = {
               </svg>`
     },
     'cartao2': {
-        value: 'cartao2',
-        label: 'Cartão 2',
-        title: 'Cartão 2',
+        value: 'cartao2', // MANTIDO: Garante compatibilidade retroativa
+        label: 'CEF',     // NOVO NOME DE EXIBIÇÃO
+        title: 'Cartão CEF',
         clsToggle:  'chip-state-cartao2',
         clsExtract: 'chip-cartao2',
-        color: '#7C3AED',
+        color: '#7C3AED', // Roxo (você pode alterar para o azul da Caixa, ex: '#005CA9')
         svg: `<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                 <rect x="1" y="4" width="22" height="16" rx="2"></rect>
                 <line x1="1" y1="10" x2="23" y2="10"></line>
