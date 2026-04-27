@@ -1,7 +1,7 @@
 // ===================================================
 // REPORTS MODULE — Centro de Análise Financeira
 // Depende de: fin_transactions e fin_budgets no localStorage
-// Depende de: window.PAYMENT_CONFIG em payment-config.js
+// Depende de: PAYMENT_CONFIG em payment-config.js
 // ===================================================
 
 const ReportsModule = (function () {
@@ -332,7 +332,8 @@ const ReportsModule = (function () {
         const content = document.getElementById('report4-content');
         if (!content) return;
 
-        const config = window.PAYMENT_CONFIG.methods;
+        // ✅ CORREÇÃO: PAYMENT_CONFIG é o objeto direto, sem .methods
+        const config = window.PAYMENT_CONFIG;
         const txns = _getTxns();
         const expenses = _getExpensesByPayment(txns, year, month, method);
         const cats = Object.keys(expenses).sort((a, b) => expenses[b] - expenses[a]);
@@ -341,11 +342,11 @@ const ReportsModule = (function () {
         const currentMeta = config[method];
         const monthVal = `${year}-${String(month + 1).padStart(2, '0')}`;
 
-        // Filtros (ignora o estado "Sem método" para o relatório)
+        // ✅ CORREÇÃO: classe ativa montada como 'active-' + m (não d.activeClass)
         const filterBtns = Object.entries(config)
             .filter(([m]) => m !== '')
             .map(([m, d]) => `
-                <button class="payment-filter-btn ${method === m ? d.activeClass : ''}"
+                <button class="payment-filter-btn ${method === m ? 'active-' + m : ''}"
                         onclick="ReportsModule._pmFilter(${year}, ${month}, '${m}')">
                     ${d.label}
                 </button>`).join('');
@@ -381,7 +382,11 @@ const ReportsModule = (function () {
     function openPaymentMethodReport() {
         const content = document.getElementById('report4-content');
         if (!content) return;
-        content.innerHTML = `<div class="skeleton-line" style="width:50%; height:2rem;"></div><div class="skeleton-line" style="width:80%;"></div>`;
+        content.innerHTML = `
+            <div class="skeleton-line" style="width:50%; height:2rem;"></div>
+            <div class="skeleton-line" style="width:80%;"></div>
+            <div class="skeleton-line" style="width:65%;"></div>
+        `;
         document.getElementById('report4-dialog').showModal();
         requestAnimationFrame(() => {
             const today = new Date();
