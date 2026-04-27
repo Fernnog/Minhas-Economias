@@ -1,15 +1,13 @@
 /**
  * js/payment-config.js
- * Centralização de Configurações de Meios de Pagamento
- * ⚠️ NÃO usar sintaxe "export" — este arquivo é carregado via <script src> padrão.
- * As variáveis são expostas globalmente para uso em script.js, extract.js e reports.js.
+ * Centralização de Configurações de Meios de Pagamento.
+ * Atribuição explícita a window para garantir acesso global
+ * via window.PAYMENT_CONFIG e window.PAYMENT_CYCLE de qualquer script.
  */
 
-// Ordem de rotação do chip cíclico no formulário
-const PAYMENT_CYCLE = ['', 'debito', 'cartao1', 'cartao2'];
+window.PAYMENT_CYCLE = ['', 'debito', 'cartao1', 'cartao2'];
 
-// Configuração central — propriedades alinhadas com script.js e extract.js
-const PAYMENT_CONFIG = {
+window.PAYMENT_CONFIG = {
     '': {
         value: '',
         label: 'Sem método',
