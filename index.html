@@ -134,13 +134,21 @@
                             <input type="hidden" id="trans-id">
                             <input type="hidden" id="trans-exception-parent">
                             <input type="hidden" id="trans-exception-date">
+                            <input type="hidden" id="trans-edit-mode" value="">
+                            <input type="hidden" id="trans-group-id" value="">
+                            <input type="hidden" id="trans-group-installment-index" value="">
                             <label>Tipo</label>
                             <select id="trans-type" required>
                                 <option value="despesa">Despesa</option>
                                 <option value="receita">Receita</option>
                             </select>
-                            <label>Valor (R$)</label>
-                            <input type="text" id="trans-amount" inputmode="numeric" placeholder="0,00" required>
+                            <div id="edit-scope-container" class="hidden" style="margin-top: 0.5rem; margin-bottom: 1rem; padding: 1rem; background: #f1f5f9; border-radius: 8px; border-left: 4px solid var(--primary);">
+                                <label>Aplicar novo valor em:</label>
+                                <select id="trans-edit-scope">
+                                    <option value="only_this">Apenas neste mês selecionado</option>
+                                    <option value="this_and_future">Neste mês e nos seguintes (Reajuste)</option>
+                                </select>
+                            </div>
                             <label>Categoria</label>
                             <select id="trans-category" required></select>
                             <label>Data</label>
@@ -375,6 +383,26 @@
             <button class="close-dialog" onclick="document.getElementById('report3-dialog').close()">&times;</button>
         </div>
         <div id="report3-content" class="report-dialog-body"></div>
+    </dialog>
+
+    <dialog id="edit-scope-modal">
+        <div class="dialog-header">
+            <h3 id="edit-scope-modal-title">Editar Lançamento</h3>
+            <button class="close-dialog" onclick="document.getElementById('edit-scope-modal').close()">&times;</button>
+        </div>
+        <div style="padding: 1.5rem;">
+            <p id="edit-scope-modal-desc" style="margin-bottom: 1.2rem; color: var(--text-light); font-size: 0.95rem; line-height: 1.5;"></p>
+            <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+                <button id="btn-scope-single" style="padding: 0.9rem 1rem; border-radius: 8px; border: none; background: var(--primary); color: white; cursor: pointer; text-align: left;">
+                    <strong id="btn-scope-single-label">Apenas este mês</strong>
+                    <small id="btn-scope-single-desc" style="display:block; font-weight:400; opacity:0.85; margin-top: 2px;">Somente este período será alterado</small>
+                </button>
+                <button id="btn-scope-future" style="padding: 0.9rem 1rem; border-radius: 8px; border: 2px solid var(--primary); background: transparent; color: var(--primary); cursor: pointer; text-align: left;">
+                    <strong id="btn-scope-future-label">Este e os próximos</strong>
+                    <small id="btn-scope-future-desc" style="display:block; font-weight:400; opacity:0.85; margin-top: 2px;">A alteração se aplica a este e todos os meses seguintes</small>
+                </button>
+            </div>
+        </div>
     </dialog>
 
     <div id="toast-container" class="toast-container"></div>
