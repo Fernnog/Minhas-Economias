@@ -159,6 +159,9 @@ function init() {
     const transDate = document.getElementById('trans-date');
     if (transDate) transDate.valueAsDate = new Date();
     
+    // CategoryManager deve iniciar antes dos módulos que consomem 'categories'
+    if (typeof CategoryManager !== 'undefined') CategoryManager.init();
+
     updateCategorySelect();
     
     if (typeof ExtractModule !== 'undefined') ExtractModule.init();
@@ -325,15 +328,27 @@ categoryForm?.addEventListener('submit', function(e) {
     if (!newCatInput) return;
     const newCatName = newCatInput.value.trim();
     if (!newCatName) return;
-    if (categories.some(c => c.toLowerCase() === newCatName.toLowerCase())) {
-        alert(`A categoria "${newCatName}" já existe.`);
-        return;
+
+    // Delega para o CategoryManager — ponto central de criação
+    if (typeof CategoryManager !== 'undefined') {
+        const success = CategoryManager.add(newCatName);
+        if (success) {
+            newCatInput.value = '';
+            newCatInput.placeholder = `✅ "${newCatName}" adicionada!`;
+            setTimeout(() => { newCatInput.placeholder = 'Nome da categoria...'; }, 2500);
+        }
+    } else {
+        // Fallback caso o CategoryManager não esteja disponível
+        if (categories.some(c => c.toLowerCase() === newCatName.toLowerCase())) {
+            alert(`A categoria "${newCatName}" já existe.`);
+            return;
+        }
+        categories.push(newCatName);
+        notifyCategoryChange();
+        newCatInput.value = '';
+        newCatInput.placeholder = `✅ "${newCatName}" adicionada!`;
+        setTimeout(() => { newCatInput.placeholder = 'Nome da categoria...'; }, 2500);
     }
-    categories.push(newCatName);
-    notifyCategoryChange();
-    newCatInput.value = '';
-    newCatInput.placeholder = `✅ "${newCatName}" adicionada!`;
-    setTimeout(() => { newCatInput.placeholder = 'Nome da categoria...'; }, 2500);
 });
 
 function renderPinnedBudgets(gastosDoMes, mesAtual, anoAtual) {

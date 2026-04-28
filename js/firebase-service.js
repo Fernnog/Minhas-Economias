@@ -152,11 +152,15 @@ const FirebaseModule = (function() {
                 localStorage.setItem('fin_transactions', JSON.stringify(transactions));
             }
 
-            // B) Sincronizar Categorias
+            // B) Sincronizar Categorias (via CategoryManager para notificar todos os módulos)
             const catRef = await db.collection('users').doc(uid).collection('categories').get();
             if(!catRef.empty) {
-                categories = catRef.docs.map(doc => doc.data().name);
-                localStorage.setItem('fin_categories', JSON.stringify(categories));
+                const cloudCategories = catRef.docs.map(doc => doc.data().name);
+                localStorage.setItem('fin_categories', JSON.stringify(cloudCategories));
+                // CategoryManager reinicia com os dados da nuvem e notifica BudgetModule + updateCategorySelect
+                if (typeof CategoryManager !== 'undefined') {
+                    CategoryManager.init();
+                }
             }
 
             // C) Sincronizar Orçamentos
