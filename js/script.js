@@ -3,6 +3,9 @@ let transactions = JSON.parse(localStorage.getItem('fin_transactions')) || [];
 let categories = JSON.parse(localStorage.getItem('fin_categories')) || ['Alimentação', 'Moradia', 'Transporte', 'Salário', 'Lazer'];
 let pinnedBudgets = JSON.parse(localStorage.getItem('fin_pinned_budgets')) || [];
 
+// Estado do fluxo de edição com escopo (parcelas e recorrentes)
+let _pendingEdit = null;
+
 /**
  * FUNÇÃO UTILITÁRIA GLOBAL — Fonte Única da Verdade para Gastos Mensais
  */
@@ -166,6 +169,21 @@ function init() {
     if (typeof BudgetModule !== 'undefined') BudgetModule.init();
     
     updateAllViews();
+
+    document.getElementById('btn-scope-single')?.addEventListener('click', () => window._handleScopeSelection('single'));
+    document.getElementById('btn-scope-future')?.addEventListener('click', () => window._handleScopeSelection('future'));
+
+    if (recurrenceSelect) {
+        recurrenceSelect.addEventListener('change', (e) => {
+            const labelEl = document.getElementById('label-amount');
+            if (!labelEl) return;
+            if (e.target.value === 'parcelada') {
+                labelEl.innerHTML = 'Valor da Parcela (R$) <span class="label-badge-parcela">por parcela</span>';
+            } else {
+                labelEl.innerHTML = 'Valor (R$)';
+            }
+        });
+    }
 }
 
 window.showDashboard = function() {
@@ -385,52 +403,97 @@ form.addEventListener('submit', function(e) {
     const newItemsToSync = [];
 
     if (id) {
-        const transactionData = { id, type, amount, category, date, desc, isRecurring, paymentMethod };
-        const index = transactions.findIndex(t => t.id === id);
-        transactions[index] = transactionData;
-        newItemsToSync.push(transactionData);
+        const editMode = document.getElementById('trans-edit-mode')?.value || '';
+
+        if (editMode === 'parcelada_future') {
+            const groupId = document.getElementById('trans-group-id')?.value;
+            const fromIndex = parseInt(document.getElementById('trans-group-installment-index')?.value || '0');
+
+            const currentIdx = transactions.findIndex(t => t.id === id);
+            if (currentIdx > -1) {
+                transactions[currentIdx] = { ...transactions[currentIdx], type, amount, category, desc, paymentMethod };
+                newItemsToSync.push(transactions[currentIdx]);
+            }
+
+            transactions
+                .filter(t => t.groupId === groupId && t.installmentIndex > fromIndex)
+                .forEach(t => {
+                    t.amount = amount;
+                    t.type = type;
+                    t.category = category;
+                    t.paymentMethod = paymentMethod;
+                    newItemsToSync.push({...t});
+                });
+
+        } else {
+            const idx = transactions.findIndex(t => t.id === id);
+            if (idx > -1) {
+                transactions[idx] = { ...transactions[idx], type, amount, category, date, desc, paymentMethod };
+                newItemsToSync.push(transactions[idx]);
+            }
+        }
         document.getElementById('btn-save').innerText = 'Salvar Lançamento';
     } else {
         if (isParcelada) {
             const baseDate = new Date(date + 'T00:00:00');
-            const totalCents = Math.round(amount * 100);
-            const installmentCents = Math.floor(totalCents / installments);
-            const remainderCents = totalCents % installments;
+            const groupId = 'grp_' + Date.now().toString();
 
             for (let i = 0; i < installments; i++) {
                 const instDate = new Date(baseDate);
                 instDate.setMonth(instDate.getMonth() + i);
-                const currentAmount = (i === installments - 1) ? (installmentCents + remainderCents) / 100 : installmentCents / 100;
+
                 const instData = {
-                    id: Date.now().toString() + "_" + i,
-                    type, amount: currentAmount, category, date: instDate.toISOString().split('T')[0], 
-                    desc: `${desc} (${i + 1}/${installments})`, isRecurring: false, paymentMethod
+                    id: Date.now().toString() + '_' + i,
+                    type,
+                    amount,
+                    category,
+                    date: instDate.toISOString().split('T')[0],
+                    desc: `${desc} (${i + 1}/${installments})`,
+                    isRecurring: false,
+                    paymentMethod,
+                    groupId,
+                    installmentIndex: i,
+                    totalInstallments: installments
                 };
                 transactions.push(instData);
                 newItemsToSync.push(instData);
             }
         } else {
+            const exceptionParent = document.getElementById('trans-exception-parent')?.value;
+            const exceptionDate   = document.getElementById('trans-exception-date')?.value;
+            const editMode        = document.getElementById('trans-edit-mode')?.value || '';
+
             if (exceptionParent) {
                 const parentTx = transactions.find(t => t.id === exceptionParent);
-                const editScope = document.getElementById('trans-edit-scope')?.value;
                 if (parentTx) {
-                    if (editScope === 'this_and_future') {
+                    if (editMode === 'recorrente_future') {
                         parentTx.recurrenceEndDate = exceptionDate;
                         newItemsToSync.push(parentTx);
-                        const transactionData = { id: Date.now().toString(), type, amount, category, date, desc, isRecurring: true, paymentMethod };
-                        transactions.push(transactionData);
-                        newItemsToSync.push(transactionData);
+                        const newTx = {
+                            id: Date.now().toString(), type, amount, category,
+                            date: exceptionDate, desc, isRecurring: true, paymentMethod
+                        };
+                        transactions.push(newTx);
+                        newItemsToSync.push(newTx);
                     } else {
                         parentTx.skippedDates = parentTx.skippedDates || [];
-                        parentTx.skippedDates.push(exceptionDate);
+                        if (!parentTx.skippedDates.includes(exceptionDate)) {
+                            parentTx.skippedDates.push(exceptionDate);
+                        }
                         newItemsToSync.push(parentTx);
-                        const transactionData = { id: Date.now().toString(), type, amount, category, date, desc, isRecurring: false, paymentMethod };
-                        transactions.push(transactionData);
-                        newItemsToSync.push(transactionData);
+                        const newTx = {
+                            id: Date.now().toString(), type, amount, category,
+                            date: exceptionDate, desc, isRecurring: false, paymentMethod
+                        };
+                        transactions.push(newTx);
+                        newItemsToSync.push(newTx);
                     }
                 }
             } else {
-                const transactionData = { id: Date.now().toString(), type, amount, category, date, desc, isRecurring, paymentMethod };
+                const transactionData = {
+                    id: Date.now().toString(), type, amount, category,
+                    date, desc, isRecurring, paymentMethod
+                };
                 transactions.push(transactionData);
                 newItemsToSync.push(transactionData);
             }
@@ -443,6 +506,11 @@ form.addEventListener('submit', function(e) {
     form.reset();
     setPaymentChip(''); // Reset visual do chip
     document.getElementById('trans-id').value = '';
+    document.getElementById('trans-edit-mode').value = '';
+    document.getElementById('trans-group-id').value = '';
+    document.getElementById('trans-group-installment-index').value = '';
+    const labelEl = document.getElementById('label-amount');
+    if (labelEl) labelEl.innerHTML = 'Valor (R$)';
     const transDateInput = document.getElementById('trans-date');
     if (transDateInput) transDateInput.valueAsDate = new Date();
     showToast(id ? 'Lançamento atualizado com sucesso!' : 'Novo lançamento salvo!');
@@ -459,28 +527,44 @@ window.deleteTransaction = function(id) {
     }
 };
 
-window.editSingleProjected = function(id, date) {
-    const parentId = id.replace('_proj', '');
+function _populateFormForEdit(trans, overrides = {}) {
+    document.getElementById('trans-id').value = overrides.id !== undefined ? overrides.id : trans.id;
+    document.getElementById('trans-type').value = trans.type;
+    document.getElementById('trans-amount').value = trans.amount.toFixed(2).replace('.', ',');
+    document.getElementById('trans-category').value = trans.category;
+    document.getElementById('trans-date').value = overrides.date || trans.date;
+    document.getElementById('trans-desc').value = trans.desc;
+    document.getElementById('trans-exception-parent').value = overrides.exceptionParent || '';
+    document.getElementById('trans-exception-date').value = overrides.exceptionDate || '';
+    document.getElementById('trans-edit-mode').value = overrides.editMode || '';
+    document.getElementById('trans-group-id').value = overrides.groupId || '';
+    document.getElementById('trans-group-installment-index').value = overrides.groupIndex !== undefined ? overrides.groupIndex : '';
+
+    setPaymentChip(trans.paymentMethod || '');
+    if (recurrenceSelect) {
+        recurrenceSelect.value = overrides.recurrenceValue || (trans.isRecurring ? 'recorrente' : 'unica');
+        recurrenceSelect.dispatchEvent(new Event('change'));
+    }
+
+    document.getElementById('btn-save').innerText = 'Atualizar Lançamento';
+    showView('form');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+window.editSingleProjected = function(projId, date) {
+    const parentId = projId.replace('_proj', '');
     const parentTx = transactions.find(t => t.id === parentId);
     if (!parentTx) return;
 
-    document.getElementById('trans-id').value = ''; 
-    document.getElementById('trans-exception-parent').value = parentId;
-    document.getElementById('trans-exception-date').value = date;
-    document.getElementById('trans-type').value = parentTx.type;
-    document.getElementById('trans-amount').value = parentTx.amount.toFixed(2).replace('.', ',');
-    document.getElementById('trans-category').value = parentTx.category;
-    document.getElementById('trans-date').value = date;
-    document.getElementById('trans-desc').value = parentTx.desc;
-    document.getElementById('trans-recurrence-type').value = 'unica';
-    
-    setPaymentChip(parentTx.paymentMethod || ''); // Sincroniza o chip
-
-    const scopeContainer = document.getElementById('edit-scope-container');
-    if (scopeContainer) scopeContainer.classList.remove('hidden');
-    document.getElementById('btn-save').innerText = 'Salvar Alteração';
-    showView('form');
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    _pendingEdit = { type: 'recorrente_virtual', parentId, trans: parentTx, date };
+    const modal = document.getElementById('edit-scope-modal');
+    document.getElementById('edit-scope-modal-title').textContent = 'Editar Recorrência';
+    document.getElementById('edit-scope-modal-desc').textContent = `Você está editando "${parentTx.desc}". A alteração deve afetar só este mês ou este e os seguintes?`;
+    document.getElementById('btn-scope-single-label').textContent = 'Apenas este mês';
+    document.getElementById('btn-scope-single-desc').textContent = 'Os outros meses permanecem com o valor original';
+    document.getElementById('btn-scope-future-label').textContent = 'Este e os próximos meses';
+    document.getElementById('btn-scope-future-desc').textContent = 'Encerra a recorrência atual e inicia uma nova com o valor atualizado';
+    modal.showModal();
 };
 
 window.stopRecurrence = function(id, date) {
@@ -498,21 +582,65 @@ window.stopRecurrence = function(id, date) {
 
 window.editTransaction = function(id) {
     const trans = transactions.find(t => t.id === id);
-    if (trans) {
-        document.getElementById('trans-id').value = trans.id;
-        document.getElementById('trans-type').value = trans.type;
-        document.getElementById('trans-amount').value = trans.amount.toFixed(2).replace('.', ',');
-        document.getElementById('trans-category').value = trans.category;
-        document.getElementById('trans-date').value = trans.date;
-        document.getElementById('trans-desc').value = trans.desc;
-        setPaymentChip(trans.paymentMethod || ''); // Sincroniza o chip
-        if (recurrenceSelect) {
-            recurrenceSelect.value = trans.isRecurring ? 'recorrente' : 'unica';
-            recurrenceSelect.dispatchEvent(new Event('change'));
+    if (!trans) return;
+
+    if (trans.groupId) {
+        _pendingEdit = { type: 'parcelada', id, trans };
+        const modal = document.getElementById('edit-scope-modal');
+        document.getElementById('edit-scope-modal-title').textContent = 'Editar Parcela';
+        document.getElementById('edit-scope-modal-desc').textContent = `Você está editando "${trans.desc}". A alteração deve afetar somente esta parcela ou esta e todas as próximas do mesmo grupo?`;
+        document.getElementById('btn-scope-single-label').textContent = 'Apenas esta parcela';
+        document.getElementById('btn-scope-single-desc').textContent = 'Somente o valor deste mês é alterado';
+        document.getElementById('btn-scope-future-label').textContent = 'Esta e as parcelas seguintes';
+        document.getElementById('btn-scope-future-desc').textContent = `Atualiza esta parcela e as ${trans.totalInstallments - trans.installmentIndex - 1} restantes do grupo`;
+        modal.showModal();
+        return;
+    }
+
+    if (trans.isRecurring) {
+        _pendingEdit = { type: 'recorrente_real', id, trans, date: trans.date };
+        const modal = document.getElementById('edit-scope-modal');
+        document.getElementById('edit-scope-modal-title').textContent = 'Editar Recorrência';
+        document.getElementById('edit-scope-modal-desc').textContent = `Você está editando "${trans.desc}". A alteração deve valer só para o mês de origem ou para este e todos os meses seguintes?`;
+        document.getElementById('btn-scope-single-label').textContent = 'Apenas o mês de origem';
+        document.getElementById('btn-scope-single-desc').textContent = 'Cria uma exceção somente naquela data';
+        document.getElementById('btn-scope-future-label').textContent = 'Este e os próximos meses';
+        document.getElementById('btn-scope-future-desc').textContent = 'Encerra a recorrência atual e cria uma nova com o valor atualizado';
+        modal.showModal();
+        return;
+    }
+
+    _populateFormForEdit(trans);
+};
+
+window._handleScopeSelection = function(scope) {
+    const modal = document.getElementById('edit-scope-modal');
+    if (modal) modal.close();
+    if (!_pendingEdit) return;
+
+    const { type, id, trans, parentId, date } = _pendingEdit;
+    _pendingEdit = null;
+
+    if (type === 'parcelada') {
+        if (scope === 'single') {
+            _populateFormForEdit(trans);
+        } else {
+            _populateFormForEdit(trans, { editMode: 'parcelada_future', groupId: trans.groupId, groupIndex: trans.installmentIndex });
         }
-        document.getElementById('btn-save').innerText = 'Atualizar Lançamento';
-        showView('form');
-        window.scrollTo({ top: 0, behavior: 'smooth' });
+    } else if (type === 'recorrente_real') {
+        if (scope === 'single') {
+            _populateFormForEdit(trans, { id: '', date: trans.date, exceptionParent: trans.id, exceptionDate: trans.date, recurrenceValue: 'unica' });
+        } else {
+            _populateFormForEdit(trans, { id: '', date: trans.date, exceptionParent: trans.id, exceptionDate: trans.date, editMode: 'recorrente_future', recurrenceValue: 'recorrente' });
+        }
+    } else if (type === 'recorrente_virtual') {
+        const parentTx = transactions.find(t => t.id === parentId);
+        if (!parentTx) return;
+        if (scope === 'single') {
+            _populateFormForEdit(parentTx, { id: '', date, exceptionParent: parentId, exceptionDate: date, recurrenceValue: 'unica' });
+        } else {
+            _populateFormForEdit(parentTx, { id: '', date, exceptionParent: parentId, exceptionDate: date, editMode: 'recorrente_future', recurrenceValue: 'recorrente' });
+        }
     }
 };
 
