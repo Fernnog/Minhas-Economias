@@ -774,6 +774,76 @@ dialog::backdrop { background: rgba(15, 23, 42, 0.5); backdrop-filter: blur(4px)
 
 .day-balance-row span.despesa { color: var(--danger); }
 
+/* === CONFERÊNCIA DE LANÇAMENTOS === */
+
+/* Span clicável do nome do lançamento */
+.extract-name {
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    border-radius: 4px;
+    padding: 1px 3px;
+    margin: -1px -3px;
+    transition: background 0.15s ease, font-weight 0.15s ease;
+    user-select: none;
+}
+
+.extract-name:hover {
+    background: rgba(201, 168, 76, 0.10);
+}
+
+.extract-name:active {
+    transform: scale(0.97);
+}
+
+/* Estado: conferido */
+.extract-name.confirmed {
+    font-weight: 700;
+    color: var(--text);
+}
+
+/* Ícone de check que aparece ao lado do nome conferido */
+.confirm-check-icon {
+    flex-shrink: 0;
+    color: var(--primary-dark);
+    opacity: 0.85;
+}
+
+/* Linha inteira quando conferida — sutil, sem cores gritantes */
+.extract-row.confirmed td {
+    opacity: 0.72;
+}
+
+/* === BOTÃO DE FILTRO DO EXTRATO === */
+.btn-filter-extract {
+    background: var(--card);
+    color: var(--text-light);
+    border: 1px solid var(--border);
+    transition: all 0.2s ease;
+}
+
+/* Modo 1 — apenas conferidos: destaque suave dourado */
+.btn-filter-extract[data-filter-mode="1"] {
+    background: rgba(201, 168, 76, 0.12);
+    color: var(--primary-dark);
+    border-color: rgba(201, 168, 76, 0.5);
+    box-shadow: 0 0 0 2px rgba(201, 168, 76, 0.18);
+}
+
+/* Modo 2 — apenas pendentes: destaque neutro escuro */
+.btn-filter-extract[data-filter-mode="2"] {
+    background: rgba(28, 26, 23, 0.07);
+    color: var(--text);
+    border-color: rgba(28, 26, 23, 0.25);
+    box-shadow: 0 0 0 2px rgba(28, 26, 23, 0.08);
+}
+
+.btn-filter-extract:hover {
+    border-color: var(--primary);
+    color: var(--primary);
+}
+
 /* TOAST NOTIFICATIONS (Design Clean/Minimalista) */
 .toast-container {
     position: fixed;
