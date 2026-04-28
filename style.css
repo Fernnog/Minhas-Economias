@@ -221,6 +221,17 @@ main { padding: 2rem; flex: 1; max-width: 1200px; margin: 0 auto; width: 100%; }
     box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
 }
 
+/* Container Flexbox (A "mola" protetora entre categoria e valor) */
+.pinned-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-weight: 600;
+    font-size: 0.95rem;
+    gap: 1rem;
+    margin-bottom: 0.8rem;
+}
+
 /* 2. Configura o Subcard (Chip) com fundo preto e fonte dourada */
 .pinned-card-header span:first-child, 
 .pinned-category-chip {
@@ -243,10 +254,14 @@ main { padding: 2rem; flex: 1; max-width: 1200px; margin: 0 auto; width: 100%; }
 }
 
 /* 3. Ajusta os valores (texto à direita) para legibilidade no fundo branco */
-.pinned-card-header span:last-child {
-    color: var(--text) !important; /* Texto escuro para contrastar com o branco */
-    font-weight: 600;
+.pinned-card-header span:last-child, .pinned-card-value {
+    color: var(--text) !important; 
+    white-space: nowrap;
+    text-align: right;
+    margin-top: 0; 
     font-size: 0.92rem;
+    letter-spacing: 0.3px;
+    flex-shrink: 0; /* CRÍTICO: Impede que números grandes sejam espremidos ou quebrem de linha */
 }
 
 /* Menu de Ações (Bottom) */
