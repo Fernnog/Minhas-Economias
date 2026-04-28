@@ -208,50 +208,45 @@ main { padding: 2rem; flex: 1; max-width: 1200px; margin: 0 auto; width: 100%; }
 .horizontal-scroll::-webkit-scrollbar-thumb { background-color: var(--border); border-radius: 4px; }
 
 /* Atualização do Card Fixado para tema Premium Dark Gold */
+/* 1. Garante que o Card principal seja sempre Branco */
 .pinned-card {
-    background: var(--premium-gradient);
-    border: 1px solid var(--premium-border);
-    flex-shrink: 0; 
-    min-width: 240px; 
+    background: #FFFFFF !important; /* Fundo branco puro */
+    border: 1px solid var(--border);
+    flex-shrink: 0;
+    min-width: 260px;
     padding: 1.2rem;
     border-radius: 12px;
-    scroll-snap-align: center;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.15); 
     display: flex;
     flex-direction: column;
+    box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
 }
 
-/* Modificação do layout do cabeçalho do card */
-.pinned-card-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center; 
-    font-weight: 600;
-    font-size: 0.95rem;
-    gap: 0.8rem;
-    margin-bottom: 0.8rem;
-}
-
-/* Design do Título da Categoria no Card */
-.pinned-card-header span:first-child, .pinned-category-chip {
-    background: var(--surface); /* Fundo claro em vez do gradiente preto */
-    color: var(--primary) !important;
+/* 2. Configura o Subcard (Chip) com fundo preto e fonte dourada */
+.pinned-card-header span:first-child, 
+.pinned-category-chip {
+    /* Fundo preto elegante (gradiente escuro da paleta Premium) */
+    background: linear-gradient(145deg, #1C1A17 0%, #252118 100%) !important;
+    /* Fonte Ouro Imperial */
+    color: var(--primary) !important; 
+    
     padding: 0.4rem 0.8rem;
     border-radius: 20px;
-    border: 1.5px solid var(--border); /* Borda dourada sutil */
+    border: 1px solid rgba(201, 168, 76, 0.4);
+    font-weight: 700;
     
+    /* Mantém a regra de quebra de linha para nomes longos */
     white-space: normal; 
     word-wrap: break-word;
     line-height: 1.3;
-    max-width: 60%;
+    max-width: 65%;
     text-align: center;
 }
 
-/* Design do Valor do Orçamento com Subtom Dourado */
+/* 3. Ajusta os valores (texto à direita) para legibilidade no fundo branco */
 .pinned-card-header span:last-child {
-    color: var(--premium-gold-sub) !important;
-    white-space: nowrap;
-    text-align: right;
+    color: var(--text) !important; /* Texto escuro para contrastar com o branco */
+    font-weight: 600;
+    font-size: 0.92rem;
 }
 
 /* Menu de Ações (Bottom) */
