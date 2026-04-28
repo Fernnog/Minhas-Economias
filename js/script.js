@@ -404,17 +404,19 @@ form.addEventListener('submit', function(e) {
 
     if (id) {
         const editMode = document.getElementById('trans-edit-mode')?.value || '';
+        const idx = transactions.findIndex(t => t.id === id);
 
         if (editMode === 'parcelada_future') {
-            const groupId = document.getElementById('trans-group-id')?.value;
-            const fromIndex = parseInt(document.getElementById('trans-group-installment-index')?.value || '0');
+            const groupId    = document.getElementById('trans-group-id')?.value;
+            const fromIndex  = parseInt(document.getElementById('trans-group-installment-index')?.value || '0');
 
-            const currentIdx = transactions.findIndex(t => t.id === id);
-            if (currentIdx > -1) {
-                transactions[currentIdx] = { ...transactions[currentIdx], type, amount, category, desc, paymentMethod };
-                newItemsToSync.push(transactions[currentIdx]);
+            // Atualiza esta parcela preservando campos originais
+            if (idx > -1) {
+                transactions[idx] = { ...transactions[idx], type, amount, category, desc, paymentMethod };
+                newItemsToSync.push(transactions[idx]);
             }
 
+            // Atualiza parcelas futuras do mesmo grupo
             transactions
                 .filter(t => t.groupId === groupId && t.installmentIndex > fromIndex)
                 .forEach(t => {
@@ -422,16 +424,18 @@ form.addEventListener('submit', function(e) {
                     t.type = type;
                     t.category = category;
                     t.paymentMethod = paymentMethod;
-                    newItemsToSync.push({...t});
+                    newItemsToSync.push({ ...t });
                 });
 
         } else {
-            const idx = transactions.findIndex(t => t.id === id);
+            // Edição simples — SPREAD preserva groupId, installmentIndex,
+            // totalInstallments, isRecurring e quaisquer outros campos originais
             if (idx > -1) {
                 transactions[idx] = { ...transactions[idx], type, amount, category, date, desc, paymentMethod };
                 newItemsToSync.push(transactions[idx]);
             }
         }
+
         document.getElementById('btn-save').innerText = 'Salvar Lançamento';
     } else {
         if (isParcelada) {
