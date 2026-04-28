@@ -2,7 +2,7 @@
 <html lang="pt-BR">
 <head>
     <script src="https://cdn.jsdelivr.net/npm/eruda"></script>
-<script>eruda.init();</script>
+    <script>eruda.init();</script>
     
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -93,8 +93,7 @@
 
             <section class="dashboard-body">
                 <h3 class="section-title">Orçamentos em Destaque</h3>
-                <div id="pinned-budgets-container" class="horizontal-scroll">
-                    </div>
+                <div id="pinned-budgets-container" class="horizontal-scroll"></div>
             </section>
 
             <div class="action-menu bottom-menu">
@@ -137,22 +136,22 @@
                             <input type="hidden" id="trans-edit-mode" value="">
                             <input type="hidden" id="trans-group-id" value="">
                             <input type="hidden" id="trans-group-installment-index" value="">
+
                             <label>Tipo</label>
                             <select id="trans-type" required>
                                 <option value="despesa">Despesa</option>
                                 <option value="receita">Receita</option>
                             </select>
-                            <div id="edit-scope-container" class="hidden" style="margin-top: 0.5rem; margin-bottom: 1rem; padding: 1rem; background: #f1f5f9; border-radius: 8px; border-left: 4px solid var(--primary);">
-                                <label>Aplicar novo valor em:</label>
-                                <select id="trans-edit-scope">
-                                    <option value="only_this">Apenas neste mês selecionado</option>
-                                    <option value="this_and_future">Neste mês e nos seguintes (Reajuste)</option>
-                                </select>
-                            </div>
+
+                            <label>Valor (R$)</label>
+                            <input type="text" id="trans-amount" placeholder="0,00" required>
+
                             <label>Categoria</label>
                             <select id="trans-category" required></select>
+
                             <label>Data</label>
                             <input type="date" id="trans-date" required>
+
                             <label>Descrição</label>
                             <input type="text" id="trans-desc" required>
                             
@@ -291,7 +290,7 @@
                                     </svg>
                                 </div>
                                 <h4 class="report-card-title">Gastos por Pagamento</h4>
-                                <p class="report-card-desc">Débito, Cartão 1 ou Cartão 2 — veja os totais por categoria em qualquer mês.</p>
+                                <p class="report-card-desc">Débito, Passaí ou CEF — veja os totais por categoria em qualquer mês.</p>
                                 <span class="report-card-cta">Ver Relatório →</span>
                             </button>
 
