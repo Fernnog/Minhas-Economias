@@ -545,14 +545,129 @@ function renderPinnedBudgets(gastosDoMes, mesAtual, anoAtual) {
         const percent = limit > 0 ? Math.min((spent / limit) * 100, 100) : (spent > 0 ? 100 : 0);
         let status = limit > 0 ? (percent > 90 ? 'status-danger' : (percent > 70 ? 'status-warning' : 'status-ok')) : (spent > 0 ? 'status-danger' : 'status-ok');
         return `
+           return `
             <div class="pinned-card">
-                <div class="pinned-card-header"><span>${cat}</span><span>${spent.toLocaleString('pt-BR', {style: 'currency', currency: 'BRL'})} / ${limit > 0 ? limit.toLocaleString('pt-BR', {style: 'currency', currency: 'BRL'}) : 'Sem Meta'}</span></div>
+                <div class="pinned-card-header">
+                    <button
+                        class="pinned-category-btn"
+                        onclick="openCategoryTransactions('${cat.replace(/'/g, "\\'")}', ${mesAtual}, ${anoAtual})"
+                        title="Ver lançamentos de ${cat}">
+                        ${cat}
+                    </button>
+                    <span>${spent.toLocaleString('pt-BR', {style: 'currency', currency: 'BRL'})} / ${limit > 0 ? limit.toLocaleString('pt-BR', {style: 'currency', currency: 'BRL'}) : 'Sem Meta'}</span>
+                </div>
                 <div class="progress-track" style="height: 8px; background: rgba(255, 255, 255, 0.1); border-radius: 4px; overflow: hidden;">
                     <div class="progress-fill ${status}" style="width: ${percent}%; height: 100%; transition: width 0.5s ease;"></div>
                 </div>
             </div>`;
     }).join('');
 }
+
+/**
+ * Retorna todos os lançamentos de despesa de uma categoria num mês/ano,
+ * incluindo recorrentes projetados — espelhando a lógica de getMonthExpenses.
+ * @param {string} category
+ * @param {number} mesAlvo  - índice 0-based
+ * @param {number} anoAlvo
+ * @returns {Array} Lista de objetos de transação (com flag isProjected)
+ */
+function _getMonthTransactionsByCategory(category, mesAlvo, anoAlvo) {
+    const result = [];
+    const mesStr = `${anoAlvo}-${String(mesAlvo + 1).padStart(2, '0')}`;
+
+    transactions.forEach(t => {
+        // Filtra apenas despesas da categoria alvo
+        if (t.type !== 'despesa') return;
+        if (t.category !== category) return;
+
+        const d = new Date(t.date + 'T00:00:00');
+        const tMonth = d.getMonth();
+        const tYear = d.getFullYear();
+
+        // --- Caso 1: Lançamento direto no mês alvo ---
+        if (tYear === anoAlvo && tMonth === mesAlvo) {
+            if (t.skippedDates && t.skippedDates.some(sd => sd.startsWith(mesStr))) return;
+            result.push({ ...t, isProjected: false });
+            return;
+        }
+
+        // --- Caso 2: Recorrente projetado para o mês alvo ---
+        if (t.isRecurring && (tYear < anoAlvo || (tYear === anoAlvo && tMonth < mesAlvo))) {
+            if (t.recurrenceEndDate) {
+                const fim = new Date(t.recurrenceEndDate);
+                if (new Date(anoAlvo, mesAlvo, 1) >= fim) return;
+            }
+            if (t.skippedDates && t.skippedDates.some(sd => sd.startsWith(mesStr))) return;
+            const diaOriginal = String(d.getDate()).padStart(2, '0');
+            result.push({ ...t, date: `${mesStr}-${diaOriginal}`, isProjected: true });
+        }
+    });
+
+    // Ordena por data crescente
+    result.sort((a, b) => new Date(a.date + 'T00:00:00') - new Date(b.date + 'T00:00:00'));
+    return result;
+}
+
+/**
+ * Abre o dialog de lançamentos filtrados por categoria e mês.
+ * Chamado pelo clique no nome da categoria nos cards de orçamento fixado.
+ * @param {string} category
+ * @param {number} mes  - índice 0-based
+ * @param {number} ano
+ */
+window.openCategoryTransactions = function(category, mes, ano) {
+    const dialog   = document.getElementById('category-transactions-dialog');
+    const titleEl  = document.getElementById('category-transactions-title');
+    const contentEl = document.getElementById('category-transactions-content');
+    if (!dialog || !titleEl || !contentEl) return;
+
+    const txs = _getMonthTransactionsByCategory(category, mes, ano);
+    const fmt = v => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+    const dataRef = new Date(ano, mes, 1);
+    const nomeMes = dataRef.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+    const nomeMesCapitalizado = nomeMes.charAt(0).toUpperCase() + nomeMes.slice(1);
+
+    // Título do dialog
+    titleEl.textContent = `${category} — ${nomeMesCapitalizado}`;
+
+    if (txs.length === 0) {
+        contentEl.innerHTML = `
+            <p class="cat-tx-empty">
+                Nenhum lançamento de despesa encontrado para <strong>${category}</strong> neste mês.
+            </p>`;
+    } else {
+        const total = txs.reduce((acc, t) => acc + t.amount, 0);
+        const count = txs.length;
+
+        contentEl.innerHTML = `
+            <div class="cat-tx-summary">
+                <span>${count} lançamento${count !== 1 ? 's' : ''}</span>
+                <span class="cat-tx-total">${fmt(total)}</span>
+            </div>
+            <ul class="cat-tx-list">
+                ${txs.map(t => {
+                    const dataFormatada = new Date(t.date + 'T00:00:00').toLocaleDateString('pt-BR');
+                    const descricao = t.desc ? t.desc : '—';
+                    const badgeHTML = t.isProjected
+                        ? \`<span class="cat-tx-badge">Recorrente</span>\`
+                        : '';
+                    return \`
+                        <li class="cat-tx-item\${t.isProjected ? ' projected' : ''}">
+                            <div class="cat-tx-info">
+                                <span class="cat-tx-desc" title="\${descricao}">\${descricao}</span>
+                                \${badgeHTML}
+                            </div>
+                            <div class="cat-tx-meta">
+                                <span class="cat-tx-date">\${dataFormatada}</span>
+                                <span class="cat-tx-amount">\${fmt(t.amount)}</span>
+                            </div>
+                        </li>\`;
+                }).join('')}
+            </ul>`;
+    }
+
+    dialog.showModal();
+};
 
 form.addEventListener('submit', function(e) {
     e.preventDefault();
