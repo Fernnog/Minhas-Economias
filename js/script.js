@@ -36,7 +36,31 @@ window.getMonthExpenses = function(mesAlvo, anoAlvo) {
     return expenses;
 };
 
-// === CHIP CÍCLICO DE MEIO DE PAGAMENTO (UI) ===
+/**
+ * FUNÇÃO UTILITÁRIA GLOBAL — Receitas por Categoria num mês/ano
+ */
+window.getMonthIncome = function(mesAlvo, anoAlvo) {
+    const income = {};
+    transactions.forEach(t => {
+        if (t.type !== 'receita') return;
+        const d = new Date(t.date + 'T00:00:00');
+        const tMonth = d.getMonth();
+        const tYear  = d.getFullYear();
+
+        if (tYear === anoAlvo && tMonth === mesAlvo) {
+            income[t.category] = (income[t.category] || 0) + t.amount;
+            return;
+        }
+        if (t.isRecurring && (tYear < anoAlvo || (tYear === anoAlvo && tMonth < mesAlvo))) {
+            if (t.recurrenceEndDate) {
+                const fim = new Date(t.recurrenceEndDate);
+                if (new Date(anoAlvo, mesAlvo, 1) >= fim) return;
+            }
+            income[t.category] = (income[t.category] || 0) + t.amount;
+        }
+    });
+    return income;
+};
 
 window.cyclePaymentMethod = function() {
     const hiddenInput = document.getElementById('trans-payment-method');
@@ -81,6 +105,9 @@ window.setPaymentChip = function(value) {
 
 // === NAVEGAÇÃO E UTILS ===
 let dashboardMonthOffset = 0;
+
+// Estado independente do gráfico de categorias (null = segue o painel)
+let _chartMonth = null; // { year, month } ou null
 
 window.showToast = function(message) {
     const container = document.getElementById('toast-container');
@@ -193,7 +220,21 @@ function init() {
     
     if (typeof ExtractModule !== 'undefined') ExtractModule.init();
     if (typeof BudgetModule !== 'undefined') BudgetModule.init();
-    
+
+    // Picker independente do card de Despesas e Receitas por Categoria
+    const chartPicker = document.getElementById('chart-month-picker');
+    if (chartPicker) {
+        const hoje = new Date();
+        chartPicker.value = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}`;
+        chartPicker.addEventListener('change', (e) => {
+            if (!e.target.value) return;
+            const [y, m] = e.target.value.split('-');
+            _chartMonth = { year: parseInt(y), month: parseInt(m) - 1 };
+            _renderChartContent(_chartMonth.month, _chartMonth.year);
+            _updateChartMonthChip(_chartMonth.month, _chartMonth.year);
+        });
+    }
+
     updateAllViews();
 }
 
@@ -304,36 +345,114 @@ function updateDashboardData() {
     if (cardAtualEl) saldoAtualTotal < 0 ? cardAtualEl.classList.add('negative') : cardAtualEl.classList.remove('negative');
     if (cardMesEl) saldoFimMesTotal < 0 ? cardMesEl.classList.add('negative') : cardMesEl.classList.remove('negative');
 
-    renderCategoryChart(gastosPorCategoria);
+    renderCategoryIncomeExpenseChart(gastosPorCategoria, mesAtual, anoAtual);
     renderPinnedBudgets(gastosPorCategoria, mesAtual, anoAtual);
 }
 
-function renderCategoryChart(gastos) {
-    const chartContainer = document.getElementById('category-chart');
-    if (!chartContainer) return;
+function renderCategoryIncomeExpenseChart(gastos, mes, ano) {
+    // Se o chart tem mês independente selecionado, usa ele (exceto para sincronizar chip inicial)
+    const targetMes = (_chartMonth !== null) ? _chartMonth.month : mes;
+    const targetAno = (_chartMonth !== null) ? _chartMonth.year  : ano;
+
+    _updateChartMonthChip(targetMes, targetAno);
+    _renderChartContent(targetMes, targetAno);
+}
+
+function _updateChartMonthChip(mes, ano) {
+    const chip = document.getElementById('chart-month-chip');
+    if (!chip) return;
+    const nome = new Date(ano, mes, 1).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+    chip.textContent = nome.charAt(0).toUpperCase() + nome.slice(1);
+}
+
+function _renderChartContent(mes, ano) {
+    const chartContainer  = document.getElementById('category-chart');
+    const totalsContainer = document.getElementById('category-chart-totals');
+    if (!chartContainer || !totalsContainer) return;
+
+    const fmt = v => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
+    const gastos  = getMonthExpenses(mes, ano);
+    const receitas = getMonthIncome(mes, ano);
+
+    const totalExp = Object.values(gastos).reduce((s, v) => s + v, 0);
+    const totalInc = Object.values(receitas).reduce((s, v) => s + v, 0);
+    const saldo    = totalInc - totalExp;
+    const saldoClass = saldo >= 0 ? 'balance-pos' : 'balance-neg';
+
+    // --- Totais ---
+    totalsContainer.innerHTML = `
+        <div class="chart-total-item">
+            <span class="chart-total-label">Receitas</span>
+            <span class="chart-total-value income">${fmt(totalInc)}</span>
+        </div>
+        <div class="chart-total-item">
+            <span class="chart-total-label">Despesas</span>
+            <span class="chart-total-value expense">${fmt(totalExp)}</span>
+        </div>
+        <div class="chart-total-item">
+            <span class="chart-total-label">Saldo</span>
+            <span class="chart-total-value ${saldoClass}">${fmt(saldo)}</span>
+        </div>
+    `;
+
     chartContainer.innerHTML = '';
-    const categorias = Object.keys(gastos);
-    if (categorias.length === 0) {
-        chartContainer.innerHTML = '<p style="text-align:center; color:#888; font-size: 0.9rem;">Nenhuma despesa registrada para este mês.</p>';
-        return;
+
+    // --- Bloco Receitas por Categoria ---
+    const catsInc = Object.keys(receitas).sort((a, b) => receitas[b] - receitas[a]);
+    if (catsInc.length > 0) {
+        const maxInc = receitas[catsInc[0]];
+        const blockInc = document.createElement('div');
+        blockInc.className = 'chart-section-block';
+        blockInc.innerHTML = `<div class="chart-section-title">Receitas por Categoria</div>`;
+        catsInc.forEach(cat => {
+            const valor = receitas[cat];
+            const pct   = (valor / maxInc * 100).toFixed(1);
+            const row   = document.createElement('div');
+            row.className = 'bar-row';
+            row.innerHTML = `
+                <div class="bar-label" title="${cat}">${cat}</div>
+                <div class="bar-track"><div class="bar-fill-income" style="width:0%;" data-target-width="${pct}%"></div></div>
+                <div class="bar-value">${fmt(valor)}</div>
+            `;
+            blockInc.appendChild(row);
+        });
+        chartContainer.appendChild(blockInc);
     }
-    const maxGasto = Math.max(...Object.values(gastos));
-    categorias.sort((a, b) => gastos[b] - gastos[a]).forEach(cat => {
-        const valor = gastos[cat];
-        const percentual = (valor / maxGasto) * 100;
-        const row = document.createElement('div');
-        row.className = 'bar-row';
-        row.innerHTML = `
-            <div class="bar-label" title="${cat}">${cat}</div>
-            <div class="bar-track"><div class="bar-fill" style="width: 0%;" data-target-width="${percentual}%"></div></div>
-            <div class="bar-value">${valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</div>
-        `;
-        chartContainer.appendChild(row);
-    });
+
+    // --- Bloco Despesas por Categoria ---
+    const catsExp = Object.keys(gastos).sort((a, b) => gastos[b] - gastos[a]);
+    if (catsExp.length > 0) {
+        const maxExp = gastos[catsExp[0]];
+        const blockExp = document.createElement('div');
+        blockExp.className = 'chart-section-block';
+        blockExp.innerHTML = `<div class="chart-section-title">Despesas por Categoria</div>`;
+        catsExp.forEach(cat => {
+            const valor = gastos[cat];
+            const pct   = (valor / maxExp * 100).toFixed(1);
+            const row   = document.createElement('div');
+            row.className = 'bar-row';
+            row.innerHTML = `
+                <div class="bar-label" title="${cat}">${cat}</div>
+                <div class="bar-track"><div class="bar-fill" style="width:0%;" data-target-width="${pct}%"></div></div>
+                <div class="bar-value">${fmt(valor)}</div>
+            `;
+            blockExp.appendChild(row);
+        });
+        chartContainer.appendChild(blockExp);
+    }
+
+    if (catsInc.length === 0 && catsExp.length === 0) {
+        chartContainer.innerHTML = '<p style="text-align:center; color:#888; font-size:0.9rem;">Nenhum lançamento registrado para este mês.</p>';
+    }
+
     setTimeout(() => {
-        document.querySelectorAll('.bar-fill').forEach(bar => { bar.style.width = bar.getAttribute('data-target-width'); });
+        document.querySelectorAll('#category-chart .bar-fill, #category-chart .bar-fill-income').forEach(bar => {
+            bar.style.width = bar.getAttribute('data-target-width');
+        });
     }, 50);
 }
+
 
 function updateCategorySelect() {
     if (!categorySelect) return;
