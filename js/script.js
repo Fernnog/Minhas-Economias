@@ -395,6 +395,32 @@ function _getMonthExpensesAll(mesAlvo, anoAlvo) {
     return expenses;
 }
 
+/**
+ * Expande/recolhe as linhas-filho de um grupo no gráfico de categorias.
+ * @param {string} groupId
+ */
+function _toggleGroupRows(groupId) {
+    const children = document.querySelectorAll(`[data-child-of="${groupId}"]`);
+    const chevron  = document.getElementById(`chv-${groupId}`);
+    const isOpen   = chevron && chevron.textContent.trim() === '▼';
+
+    children.forEach(row => {
+        if (isOpen) {
+            row.classList.add('hidden');
+        } else {
+            row.classList.remove('hidden');
+            // Anima as barras filhas ao expandir
+            setTimeout(() => {
+                row.querySelectorAll('[data-target-width]').forEach(bar => {
+                    bar.style.width = bar.getAttribute('data-target-width');
+                });
+            }, 30);
+        }
+    });
+
+    if (chevron) chevron.textContent = isOpen ? '▶' : '▼';
+}
+
 function _renderChartContent(mes, ano) {
     const chartContainer  = document.getElementById('category-chart');
     const totalsContainer = document.getElementById('category-chart-totals');
@@ -450,25 +476,80 @@ function _renderChartContent(mes, ano) {
         chartContainer.appendChild(blockInc);
     }
 
-    // --- Bloco Despesas por Categoria ---
-    const catsExp = Object.keys(gastos).sort((a, b) => gastos[b] - gastos[a]);
-    if (catsExp.length > 0) {
-        const maxExp = gastos[catsExp[0]];
+   // --- Bloco Despesas por Categoria (AGRUPADO) ---
+    if (Object.keys(gastos).length > 0) {
         const blockExp = document.createElement('div');
         blockExp.className = 'chart-section-block';
         blockExp.innerHTML = `<div class="chart-section-title">Despesas por Categoria</div>`;
-        catsExp.forEach(cat => {
-            const valor = gastos[cat];
-            const pct   = (valor / maxExp * 100).toFixed(1);
-            const row   = document.createElement('div');
-            row.className = 'bar-row';
-            row.innerHTML = `
-                <div class="bar-label" title="${cat}">${cat}</div>
-                <div class="bar-track"><div class="bar-fill" style="width:0%;" data-target-width="${pct}%"></div></div>
-                <div class="bar-value">${fmt(valor)}</div>
-            `;
-            blockExp.appendChild(row);
-        });
+
+        const useGroups = typeof CategoryGroups !== 'undefined';
+
+        if (useGroups) {
+            const grouped = CategoryGroups.groupExpenses(gastos);
+            const maxGroupTotal = grouped.length > 0 ? grouped[0].total : 1;
+
+            grouped.forEach((g, idx) => {
+                const pctParent = (g.total / maxGroupTotal * 100).toFixed(1);
+                const groupId   = `grp-${g.parent.id}-${idx}`;
+
+                // Linha do grupo (clicável para expandir)
+                const parentRow = document.createElement('div');
+                parentRow.className = 'bar-row bar-row-parent';
+                parentRow.setAttribute('data-group', groupId);
+                parentRow.style.cursor = 'pointer';
+                parentRow.innerHTML = `
+                    <div class="bar-label bar-label-parent" title="${g.parent.name}" style="color:${g.parent.color}; font-weight:700;">
+                        <span class="group-chevron" id="chv-${groupId}">▶</span>
+                        ${g.parent.name}
+                        <small style="font-weight:400; color:var(--text-light);">(${g.children.length})</small>
+                    </div>
+                    <div class="bar-track">
+                        <div class="bar-fill" style="width:0%; background:${g.parent.color};" data-target-width="${pctParent}%"></div>
+                    </div>
+                    <div class="bar-value" style="color:${g.parent.color};">${fmt(g.total)}</div>
+                `;
+                parentRow.addEventListener('click', () => _toggleGroupRows(groupId));
+                blockExp.appendChild(parentRow);
+
+                // Linhas filhas (recolhidas por padrão)
+                const maxChild = g.children[0]?.value || 1;
+                g.children.forEach(child => {
+                    const pctChild = (child.value / maxChild * 100).toFixed(1);
+                    const childRow = document.createElement('div');
+                    childRow.className = 'bar-row bar-row-child hidden';
+                    childRow.setAttribute('data-child-of', groupId);
+                    childRow.style.paddingLeft = '1rem';
+                    childRow.innerHTML = `
+                        <div class="bar-label" title="${child.name}" style="font-size:0.85rem; color:var(--text-light);">
+                            ↳ ${child.name}
+                        </div>
+                        <div class="bar-track">
+                            <div class="bar-fill bar-fill-child" style="width:0%; background:${g.parent.color}88;" data-target-width="${pctChild}%"></div>
+                        </div>
+                        <div class="bar-value" style="font-size:0.85rem;">${fmt(child.value)}</div>
+                    `;
+                    blockExp.appendChild(childRow);
+                });
+            });
+
+        } else {
+            // Fallback: comportamento original (flat list)
+            const catsExp = Object.keys(gastos).sort((a, b) => gastos[b] - gastos[a]);
+            const maxExp = gastos[catsExp[0]];
+            catsExp.forEach(cat => {
+                const valor = gastos[cat];
+                const pct   = (valor / maxExp * 100).toFixed(1);
+                const row   = document.createElement('div');
+                row.className = 'bar-row';
+                row.innerHTML = `
+                    <div class="bar-label" title="${cat}">${cat}</div>
+                    <div class="bar-track"><div class="bar-fill" style="width:0%;" data-target-width="${pct}%"></div></div>
+                    <div class="bar-value">${fmt(valor)}</div>
+                `;
+                blockExp.appendChild(row);
+            });
+        }
+
         chartContainer.appendChild(blockExp);
     }
 
@@ -487,32 +568,93 @@ function _renderChartContent(mes, ano) {
 function updateCategorySelect() {
     if (!categorySelect) return;
     categorySelect.innerHTML = '';
-    let uniqueCats = [...new Set(categories.map(c => c.trim()))];
-    const regularCats = uniqueCats.filter(c => c.toLowerCase() !== 'sem category' && c.toLowerCase() !== 'sem categoria').sort();
-    categories = [...regularCats, 'Sem Categoria'];
-    categories.forEach(cat => {
-        const option = document.createElement('option');
-        option.value = cat;
-        option.innerText = cat;
-        categorySelect.appendChild(option);
-    });
+
+    const useGroups = typeof CategoryGroups !== 'undefined';
+
+    if (useGroups) {
+        const groups = CategoryGroups.getGroups();
+        const assignedSet = new Set();
+
+        groups.forEach(g => {
+            const subs = g.subcategories.filter(s => categories.includes(s));
+            if (subs.length === 0) return;
+            const optgroup = document.createElement('optgroup');
+            optgroup.label = g.name;
+            subs.sort().forEach(cat => {
+                const opt = document.createElement('option');
+                opt.value = cat;
+                opt.textContent = cat;
+                optgroup.appendChild(opt);
+                assignedSet.add(cat);
+            });
+            categorySelect.appendChild(optgroup);
+        });
+
+        // Categorias sem grupo (legadas)
+        const ungrouped = categories.filter(c => !assignedSet.has(c) && c !== 'Sem Categoria' && c.toLowerCase() !== 'sem category');
+        if (ungrouped.length > 0) {
+            const grpOthers = document.createElement('optgroup');
+            grpOthers.label = 'Outros';
+            ungrouped.sort().forEach(cat => {
+                const opt = document.createElement('option');
+                opt.value = cat;
+                opt.textContent = cat;
+                grpOthers.appendChild(opt);
+            });
+            categorySelect.appendChild(grpOthers);
+        }
+
+        // Sem Categoria sempre por último
+        const optSem = document.createElement('option');
+        optSem.value = 'Sem Categoria';
+        optSem.textContent = 'Sem Categoria';
+        categorySelect.appendChild(optSem);
+
+    } else {
+        // Comportamento original como fallback
+        let uniqueCats = [...new Set(categories.map(c => c.trim()))];
+        const regularCats = uniqueCats.filter(c => c.toLowerCase() !== 'sem category' && c.toLowerCase() !== 'sem categoria').sort();
+        categories = [...regularCats, 'Sem Categoria'];
+        categories.forEach(cat => {
+            const option = document.createElement('option');
+            option.value = cat;
+            option.innerText = cat;
+            categorySelect.appendChild(option);
+        });
+    }
 }
 
 categoryForm?.addEventListener('submit', function(e) {
     e.preventDefault();
-    const newCatInput = document.getElementById('new-category');
+    const newCatInput  = document.getElementById('new-category');
+    const parentSelect = document.getElementById('new-category-parent'); // ← NOVO
     if (!newCatInput) return;
     const newCatName = newCatInput.value.trim();
+    const parentId   = parentSelect ? parentSelect.value : '';
     if (!newCatName) return;
 
     // Delega para o CategoryManager — ponto central de criação
     if (typeof CategoryManager !== 'undefined') {
-        const success = CategoryManager.add(newCatName);
+        const success = CategoryManager.add(newCatName, parentId); // ← passa parentId
         if (success) {
             newCatInput.value = '';
+            if (parentSelect) parentSelect.value = '';
             newCatInput.placeholder = `✅ "${newCatName}" adicionada!`;
-            setTimeout(() => { newCatInput.placeholder = 'Nome da categoria...'; }, 2500);
+            setTimeout(() => { newCatInput.placeholder = 'Ex: Aluguel, Remédios, Netflix...'; }, 2500);
         }
+    } else {
+        // Fallback caso o CategoryManager não esteja disponível
+        if (categories.some(c => c.toLowerCase() === newCatName.toLowerCase())) {
+            alert(`A categoria "${newCatName}" já existe.`);
+            return;
+        }
+        categories.push(newCatName);
+        notifyCategoryChange();
+        newCatInput.value = '';
+        if (parentSelect) parentSelect.value = '';
+        newCatInput.placeholder = `✅ "${newCatName}" adicionada!`;
+        setTimeout(() => { newCatInput.placeholder = 'Ex: Aluguel, Remédios, Netflix...'; }, 2500);
+    }
     } else {
         // Fallback caso o CategoryManager não esteja disponível
         if (categories.some(c => c.toLowerCase() === newCatName.toLowerCase())) {
