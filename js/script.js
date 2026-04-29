@@ -315,6 +315,8 @@ function updateDashboardData() {
         todasTransacoes.push(t);
 
         if (t.isRecurring && (tYear < anoAtual || (tYear === anoAtual && tMonth < mesAtual))) {
+            const mesStr = `${anoAtual}-${String(mesAtual + 1).padStart(2, '0')}`;
+            if (t.skippedDates && t.skippedDates.some(sd => sd.startsWith(mesStr))) return;
             const dataProjetada = new Date(anoAtual, mesAtual, d.getDate());
             const dataTermino = t.recurrenceEndDate ? new Date(t.recurrenceEndDate) : null;
             if (!dataTermino || dataProjetada < dataTermino) {
