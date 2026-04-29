@@ -107,6 +107,33 @@ const amountInput = document.getElementById('trans-amount');
 const dashboardView = document.getElementById('dashboard-view');
 const managementView = document.getElementById('management-view');
 
+// === UTILITÁRIO: TRAVA VISUAL DO CAMPO TIPO DE REPETIÇÃO ===
+
+/**
+ * Exibe o valor correto do tipo de repetição e bloqueia o campo visualmente,
+ * pois no modo de edição ele não tem influência funcional.
+ * @param {'recorrente'|'parcelada'|'unica'} value - Valor a ser exibido
+ */
+function lockRecurrenceField(value) {
+    const sel = document.getElementById('trans-recurrence-type');
+    if (!sel) return;
+    sel.value = value;
+    sel.classList.add('select-locked');
+    // Garante que o container de parcelas não apareça desnecessariamente
+    if (parcelasContainer) parcelasContainer.classList.add('hidden');
+}
+
+/**
+ * Restaura o campo ao estado interativo padrão (usado após salvar/resetar).
+ */
+function unlockRecurrenceField() {
+    const sel = document.getElementById('trans-recurrence-type');
+    if (!sel) return;
+    sel.classList.remove('select-locked');
+}
+
+// =========================================================
+
 function notifyCategoryChange() {
     saveData();
     updateCategorySelect();
@@ -472,6 +499,7 @@ form.addEventListener('submit', function(e) {
     if (typeof FirebaseModule !== 'undefined') newItemsToSync.forEach(t => FirebaseModule.syncData('transactions', t));
     updateAllViews();
     form.reset();
+    unlockRecurrenceField(); // ← Restaura o campo após salvar
     setPaymentChip('');
     document.getElementById('trans-id').value = '';
     const transDateInput = document.getElementById('trans-date');
@@ -503,7 +531,9 @@ window.editSingleProjected = function(id, date) {
     document.getElementById('trans-category').value = parentTx.category;
     document.getElementById('trans-date').value = date;
     document.getElementById('trans-desc').value = parentTx.desc;
-    document.getElementById('trans-recurrence-type').value = 'unica';
+
+    // ← ALTERADO: exibe o tipo real e bloqueia o campo (era hardcoded como 'unica')
+    lockRecurrenceField('recorrente');
     
     setPaymentChip(parentTx.paymentMethod || '');
 
@@ -539,13 +569,24 @@ window.editTransaction = function(id) {
     document.getElementById('trans-desc').value = trans.desc;
     setPaymentChip(trans.paymentMethod || ''); 
 
-    if (recurrenceSelect) {
-        recurrenceSelect.value = trans.isRecurring ? 'recorrente' : 'unica';
-        recurrenceSelect.dispatchEvent(new Event('change'));
-    }
-
+    // ← ALTERADO: lógica de exibição do campo "Tipo de Repetição" no modo de edição
     const isInstallment = trans.id.includes('_');
     const scopeContainer = document.getElementById('edit-scope-container');
+
+    if (recurrenceSelect) {
+        if (isInstallment) {
+            // Parcela de compra parcelada: exibe o tipo correto e trava
+            lockRecurrenceField('parcelada');
+        } else if (trans.isRecurring) {
+            // Lançamento recorrente: exibe o tipo correto e trava
+            lockRecurrenceField('recorrente');
+        } else {
+            // Lançamento único sem vínculo: campo funcional, mantém interativo
+            unlockRecurrenceField();
+            recurrenceSelect.value = 'unica';
+            recurrenceSelect.dispatchEvent(new Event('change'));
+        }
+    }
     
     if ((trans.isRecurring || isInstallment) && scopeContainer) {
         scopeContainer.classList.remove('hidden');
