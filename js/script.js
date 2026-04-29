@@ -365,6 +365,34 @@ function _updateChartMonthChip(mes, ano) {
     chip.textContent = nome.charAt(0).toUpperCase() + nome.slice(1);
 }
 
+// Variante local que inclui "Sem Categoria" — usada apenas no card do gráfico
+function _getMonthExpensesAll(mesAlvo, anoAlvo) {
+    const expenses = {};
+    transactions.forEach(t => {
+        if (t.type !== 'despesa') return;
+        const d = new Date(t.date + 'T00:00:00');
+        const tMonth = d.getMonth();
+        const tYear  = d.getFullYear();
+
+        if (tYear === anoAlvo && tMonth === mesAlvo) {
+            const mesStr = `${anoAlvo}-${String(mesAlvo + 1).padStart(2, '0')}`;
+            if (t.skippedDates && t.skippedDates.some(sd => sd.startsWith(mesStr))) return;
+            expenses[t.category] = (expenses[t.category] || 0) + t.amount;
+            return;
+        }
+        if (t.isRecurring && (tYear < anoAlvo || (tYear === anoAlvo && tMonth < mesAlvo))) {
+            if (t.recurrenceEndDate) {
+                const fim = new Date(t.recurrenceEndDate);
+                if (new Date(anoAlvo, mesAlvo, 1) >= fim) return;
+            }
+            const mesStr = `${anoAlvo}-${String(mesAlvo + 1).padStart(2, '0')}`;
+            if (t.skippedDates && t.skippedDates.some(sd => sd.startsWith(mesStr))) return;
+            expenses[t.category] = (expenses[t.category] || 0) + t.amount;
+        }
+    });
+    return expenses;
+}
+
 function _renderChartContent(mes, ano) {
     const chartContainer  = document.getElementById('category-chart');
     const totalsContainer = document.getElementById('category-chart-totals');
@@ -372,7 +400,7 @@ function _renderChartContent(mes, ano) {
 
     const fmt = v => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
-    const gastos  = getMonthExpenses(mes, ano);
+    const gastos  = _getMonthExpensesAll(mes, ano);
     const receitas = getMonthIncome(mes, ano);
 
     const totalExp = Object.values(gastos).reduce((s, v) => s + v, 0);
