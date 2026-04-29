@@ -655,18 +655,6 @@ categoryForm?.addEventListener('submit', function(e) {
         newCatInput.placeholder = `✅ "${newCatName}" adicionada!`;
         setTimeout(() => { newCatInput.placeholder = 'Ex: Aluguel, Remédios, Netflix...'; }, 2500);
     }
-    } else {
-        // Fallback caso o CategoryManager não esteja disponível
-        if (categories.some(c => c.toLowerCase() === newCatName.toLowerCase())) {
-            alert(`A categoria "${newCatName}" já existe.`);
-            return;
-        }
-        categories.push(newCatName);
-        notifyCategoryChange();
-        newCatInput.value = '';
-        newCatInput.placeholder = `✅ "${newCatName}" adicionada!`;
-        setTimeout(() => { newCatInput.placeholder = 'Nome da categoria...'; }, 2500);
-    }
 });
 
 function renderPinnedBudgets(gastosDoMes, mesAtual, anoAtual) {
