@@ -468,6 +468,38 @@ main { padding: 2rem; flex: 1; max-width: 1200px; margin: 0 auto; width: 100%; }
     color: var(--text);
 }
 
+/* ── Gráfico: linha-pai de grupo ── */
+.bar-row-parent {
+    margin-top: 0.6rem;
+    padding: 0.3rem 0;
+    border-top: 1px solid var(--border);
+    transition: opacity 0.15s;
+}
+.bar-row-parent:first-child { border-top: none; margin-top: 0; }
+.bar-row-parent:hover { opacity: 0.85; }
+
+.bar-label-parent { font-weight: 700; }
+
+.group-chevron {
+    font-size: 0.6rem;
+    display: inline-block;
+    margin-right: 0.3rem;
+    transition: transform 0.2s;
+    vertical-align: middle;
+}
+
+/* ── Gráfico: linha-filho (indentada) ── */
+.bar-row-child {
+    opacity: 0.85;
+    animation: fadeInRow 0.2s ease;
+}
+.bar-row-child.hidden { display: none; }
+
+@keyframes fadeInRow {
+    from { opacity: 0; transform: translateY(-4px); }
+    to   { opacity: 0.85; transform: translateY(0); }
+}
+
 /* === GERENCIAMENTO VIEW === */
 #management-view .grid-layout {
     display: flex; 
@@ -1537,6 +1569,13 @@ button.btn-voltar.btn-dark-gold {
 #category-list li.is-editing {
     border-color: var(--primary);
     background-color: rgba(201, 168, 76, 0.06);
+}
+
+/* ── CategoryManager: cabeçalho de grupo na lista ── */
+#category-list .cat-group-header {
+    list-style: none;
+    display: block;
+    cursor: default;
 }
 
 /* =============================================
