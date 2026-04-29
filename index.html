@@ -186,11 +186,16 @@
                         </form>
                     </div>
 
-                    <div class="card">
-                        <h3>Nova Categoria</h3>
+                   <div class="card">
+                        <h3>Nova Subcategoria</h3>
                         <form id="category-form">
-                            <input type="text" id="new-category" placeholder="Nome da categoria..." required>
-                            <button type="submit">Adicionar</button>
+                            <label>Vinculada à Categoria Principal</label>
+                            <select id="new-category-parent">
+                                <option value="">— Sem vínculo (Outros) —</option>
+                                </select>
+                            <label>Nome da Subcategoria</label>
+                            <input type="text" id="new-category" placeholder="Ex: Aluguel, Remédios, Netflix..." required>
+                            <button type="submit">Adicionar Subcategoria</button>
                         </form>
                     </div>
                 </aside>
@@ -454,9 +459,10 @@
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore-compat.js"></script>
     
-    <script src="js/payment-config.js"></script>
+   <script src="js/payment-config.js"></script>
     <script src="js/firebase-service.js"></script>
     <script src="js/changelog.js"></script>
+    <script src="js/category-groups.js"></script>
     <script src="js/category-manager.js"></script>
     <script src="js/budget.js"></script>
     <script src="js/extract.js"></script>
