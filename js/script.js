@@ -187,6 +187,20 @@ if (amountInput) {
     });
 }
 
+function populateCategoryGroups() {
+    if (typeof CategoryGroups === 'undefined') return;
+    
+    const parents = CategoryGroups.getFixedParents();
+    const optionsHTML = '<option value="">— Sem vínculo (Outros) —</option>' + 
+        parents.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
+
+    const selectPainel = document.getElementById('category-manager-parent');
+    const selectForm = document.getElementById('new-category-parent');
+    
+    if (selectPainel) selectPainel.innerHTML = optionsHTML;
+    if (selectForm) selectForm.innerHTML = optionsHTML;
+}
+
 function init() {
     document.querySelectorAll('dialog').forEach(d => {
         d.addEventListener('click', e => { if (e.target === d) d.close(); });
@@ -212,6 +226,8 @@ function init() {
     
     const transDate = document.getElementById('trans-date');
     if (transDate) transDate.valueAsDate = new Date();
+    
+    populateCategoryGroups();
     
     // CategoryManager deve iniciar antes dos módulos que consomem 'categories'
     if (typeof CategoryManager !== 'undefined') CategoryManager.init();
@@ -553,7 +569,7 @@ function _renderChartContent(mes, ano) {
         chartContainer.appendChild(blockExp);
     }
 
-    if (catsInc.length === 0 && catsExp.length === 0) {
+    if (catsInc.length === 0 && Object.keys(gastos).length === 0) {
         chartContainer.innerHTML = '<p style="text-align:center; color:#888; font-size:0.9rem;">Nenhum lançamento registrado para este mês.</p>';
     }
 
@@ -627,7 +643,7 @@ function updateCategorySelect() {
 categoryForm?.addEventListener('submit', function(e) {
     e.preventDefault();
     const newCatInput  = document.getElementById('new-category');
-    const parentSelect = document.getElementById('new-category-parent'); // ← NOVO
+    const parentSelect = document.getElementById('new-category-parent'); 
     if (!newCatInput) return;
     const newCatName = newCatInput.value.trim();
     const parentId   = parentSelect ? parentSelect.value : '';
@@ -635,7 +651,7 @@ categoryForm?.addEventListener('submit', function(e) {
 
     // Delega para o CategoryManager — ponto central de criação
     if (typeof CategoryManager !== 'undefined') {
-        const success = CategoryManager.add(newCatName, parentId); // ← passa parentId
+        const success = CategoryManager.add(newCatName, parentId); 
         if (success) {
             newCatInput.value = '';
             if (parentSelect) parentSelect.value = '';

@@ -71,7 +71,7 @@ const CategoryManager = (function () {
     // 3. OPERAÇÕES CRUD
     // ----------------------------------------------------------
 
-    function add(name) {
+    function add(name, parentId = '') {
         if (!name || !name.trim()) {
             showToast('Digite um nome para a categoria.');
             return false;
@@ -85,9 +85,14 @@ const CategoryManager = (function () {
         const newList = [...categories, normalized];
         _persist(newList);
 
-        // Sincroniza com a nuvem
+        // Salva a relação de subcategoria no grupo pai escolhido
+        if (parentId && typeof CategoryGroups !== 'undefined') {
+            CategoryGroups.addSubcategory(parentId, normalized);
+        }
+
+        // Sincroniza com a nuvem enviando o vínculo do pai
         if (typeof FirebaseModule !== 'undefined') {
-            FirebaseModule.syncData('categories', { id: normalized, name: normalized });
+            FirebaseModule.syncData('categories', { id: normalized, name: normalized, parentId: parentId });
         }
 
         showToast(`Categoria "${normalized}" criada com sucesso!`);
@@ -252,14 +257,17 @@ const CategoryManager = (function () {
             newBtn.addEventListener('click', () => {
                 const input        = document.getElementById('new-category-input');
                 const hiddenField  = document.getElementById('category-edit-original');
+                const parentSelect = document.getElementById('category-manager-parent');
+                
                 const originalName = hiddenField ? hiddenField.value : '';
                 const inputValue   = input ? input.value.trim() : '';
+                const parentId     = parentSelect ? parentSelect.value : '';
 
                 let success = false;
                 if (originalName) {
                     success = _edit(originalName, inputValue);
                 } else {
-                    success = add(inputValue);
+                    success = add(inputValue, parentId);
                 }
                 if (success) {
                     _setAddMode();
