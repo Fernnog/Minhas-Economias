@@ -9,17 +9,18 @@ const CategoryGroups = (function () {
     const STORAGE_KEY = 'fin_category_groups';
 
     // Categorias-mãe fixas
-    const FIXED_PARENTS = [
-        { id: 'moradia',     name: 'Moradia',     color: '#3B82F6' },
-        { id: 'alimentacao', name: 'Alimentação', color: '#10B981' },
-        { id: 'transporte',  name: 'Transporte',  color: '#F59E0B' },
-        { id: 'saude',       name: 'Saúde',       color: '#EF4444' },
-        { id: 'educacao',    name: 'Educação',     color: '#8B5CF6' },
-        { id: 'familiares',  name: 'Familiares',  color: '#EC4899' },
-        { id: 'lazer',       name: 'Lazer',       color: '#06B6D4' },
-        { id: 'dizimo',      name: 'Dízimo',      color: '#C9A84C' },
-        { id: 'imprevistos', name: 'Imprevistos', color: '#F97316' },
-    ];
+const FIXED_PARENTS = [
+    { id: 'moradia',     name: 'Moradia',              color: '#3B82F6' },
+    { id: 'alimentacao', name: 'Alimentação',           color: '#10B981' },
+    { id: 'transporte',  name: 'Transporte',            color: '#F59E0B' },
+    { id: 'saude',       name: 'Saúde',                 color: '#EF4444' },
+    { id: 'educacao',    name: 'Educação',              color: '#8B5CF6' },
+    { id: 'familiares',  name: 'Familiares',            color: '#EC4899' },
+    { id: 'lazer',       name: 'Lazer',                 color: '#06B6D4' },
+    { id: 'dizimo',      name: 'Dízimo',                color: '#C9A84C' },
+    { id: 'encargos',    name: 'Encargos & Tributos',   color: '#475569' }, // ← NOVO
+    { id: 'imprevistos', name: 'Imprevistos',           color: '#F97316' },
+];
 
     function _load() {
         try {
