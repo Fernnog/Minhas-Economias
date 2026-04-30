@@ -55,15 +55,12 @@ const CategoryManager = (function () {
     // ----------------------------------------------------------
 
     function _notifyAll() {
-        // Atualiza o <select> do formulário de lançamentos
         if (typeof updateCategorySelect === 'function') {
             updateCategorySelect();
         }
-        // Atualiza o <select> do painel de orçamentos
         if (typeof BudgetModule !== 'undefined') {
             BudgetModule.updateCategoryOptions();
         }
-        // Re-renderiza a lista visual do gerenciador
         _renderList();
     }
 
@@ -99,7 +96,7 @@ const CategoryManager = (function () {
         return true;
     }
 
-    function _edit(originalName, newName) {
+    function _edit(originalName, newName, parentId = '') {
         if (!newName || !newName.trim()) {
             showToast('O nome não pode ser vazio.');
             return false;
@@ -121,13 +118,24 @@ const CategoryManager = (function () {
         const newList = categories.map(c => (c === originalName ? trimmed : c));
         _persist(newList);
 
-        // Nuvem: remove o antigo, cria o novo
-        if (typeof FirebaseModule !== 'undefined') {
-            FirebaseModule.deleteData('categories', originalName);
-            FirebaseModule.syncData('categories', { id: trimmed, name: trimmed });
+        // --- CORREÇÃO: Atualiza a hierarquia no módulo CategoryGroups ---
+        if (typeof CategoryGroups !== 'undefined') {
+            // 1. Remove o nome antigo de qualquer grupo que ele estivesse
+            CategoryGroups.removeSubcategory(originalName);
+            
+            // 2. Se o usuário escolheu um grupo, adiciona o novo nome a ele
+            if (parentId) {
+                CategoryGroups.addSubcategory(parentId, trimmed);
+            }
         }
 
-        showToast(`Categoria renomeada para "${trimmed}".`);
+        // Nuvem: remove o antigo, cria o novo (agora com parentId)
+        if (typeof FirebaseModule !== 'undefined') {
+            FirebaseModule.deleteData('categories', originalName);
+            FirebaseModule.syncData('categories', { id: trimmed, name: trimmed, parentId: parentId });
+        }
+
+        showToast(`Categoria salva com sucesso!`);
         return true;
     }
 
@@ -141,6 +149,11 @@ const CategoryManager = (function () {
         const newList = categories.filter(c => c !== name);
         _persist(newList);
 
+        // Limpa a categoria excluída do seu grupo pai
+        if (typeof CategoryGroups !== 'undefined') {
+            CategoryGroups.removeSubcategory(name);
+        }
+
         if (typeof FirebaseModule !== 'undefined') {
             FirebaseModule.deleteData('categories', name);
         }
@@ -153,27 +166,31 @@ const CategoryManager = (function () {
     // ----------------------------------------------------------
 
     function _setAddMode() {
-        const input       = document.getElementById('new-category-input');
-        const btnSave     = document.getElementById('btn-save-category');
-        const btnCancel   = document.getElementById('btn-cancel-category-edit');
-        const hiddenField = document.getElementById('category-edit-original');
+        const input        = document.getElementById('new-category-input');
+        const btnSave      = document.getElementById('btn-save-category');
+        const btnCancel    = document.getElementById('btn-cancel-category-edit');
+        const hiddenField  = document.getElementById('category-edit-original');
+        const parentSelect = document.getElementById('category-manager-parent');
 
-        if (input)       { input.value = ''; input.placeholder = 'Nome da nova categoria...'; }
-        if (btnSave)     { btnSave.textContent = 'Adicionar'; }
-        if (btnCancel)   { btnCancel.classList.add('hidden'); }
-        if (hiddenField) { hiddenField.value = ''; }
+        if (input)        { input.value = ''; input.placeholder = 'Nome da categoria...'; }
+        if (btnSave)      { btnSave.textContent = 'Adicionar'; }
+        if (btnCancel)    { btnCancel.classList.add('hidden'); }
+        if (hiddenField)  { hiddenField.value = ''; }
+        
+        // CORREÇÃO: Limpa o seletor de grupo ao voltar pro modo Adicionar
+        if (parentSelect) { parentSelect.value = ''; }
 
-        // Remove destaque de edição em todos os itens
         document.querySelectorAll('#category-list li.is-editing')
             .forEach(li => li.classList.remove('is-editing'));
     }
 
     function startEdit(name) {
-        const input       = document.getElementById('new-category-input');
-        const btnSave     = document.getElementById('btn-save-category');
-        const btnCancel   = document.getElementById('btn-cancel-category-edit');
-        const hiddenField = document.getElementById('category-edit-original');
-        const panel       = document.getElementById('category-manager-panel');
+        const input        = document.getElementById('new-category-input');
+        const btnSave      = document.getElementById('btn-save-category');
+        const btnCancel    = document.getElementById('btn-cancel-category-edit');
+        const hiddenField  = document.getElementById('category-edit-original');
+        const panel        = document.getElementById('category-manager-panel');
+        const parentSelect = document.getElementById('category-manager-parent');
 
         if (hiddenField) hiddenField.value = name;
         if (input)       { input.value = name; input.focus(); }
@@ -181,7 +198,12 @@ const CategoryManager = (function () {
         if (btnCancel)   { btnCancel.classList.remove('hidden'); }
         if (panel)       { panel.setAttribute('open', ''); }
 
-        // Destaca o item sendo editado na lista
+        // CORREÇÃO: Descobre quem é o grupo pai atual e preenche o <select>
+        if (parentSelect && typeof CategoryGroups !== 'undefined') {
+            const currentParent = CategoryGroups.getParentOf(name);
+            parentSelect.value = currentParent ? currentParent.id : '';
+        }
+
         document.querySelectorAll('#category-list li').forEach(li => {
             li.classList.toggle('is-editing', li.dataset.cat === name);
         });
@@ -217,7 +239,7 @@ const CategoryManager = (function () {
                     </span>
                     <div class="cat-actions">
                         ${!isProtected ? `
-                        <button onclick="CategoryManager.startEdit('${cat}')" title="Renomear categoria">
+                        <button onclick="CategoryManager.startEdit('${cat}')" title="Editar categoria e grupo">
                             <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor"
                                  stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                 <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
@@ -243,15 +265,12 @@ const CategoryManager = (function () {
     // ----------------------------------------------------------
 
     function init() {
-        // Carrega dados salvos na variável global
         const saved = _load();
         categories.length = 0;
         saved.forEach(c => categories.push(c));
 
-        // Botão Salvar (Adicionar ou Editar)
         const btnSave = document.getElementById('btn-save-category');
         if (btnSave) {
-            // Remove listener anterior para evitar duplicatas em re-inits
             const newBtn = btnSave.cloneNode(true);
             btnSave.parentNode.replaceChild(newBtn, btnSave);
             newBtn.addEventListener('click', () => {
@@ -265,18 +284,17 @@ const CategoryManager = (function () {
 
                 let success = false;
                 if (originalName) {
-                    success = _edit(originalName, inputValue);
+                    // CORREÇÃO: Agora passamos o parentId para atualizar o grupo na edição
+                    success = _edit(originalName, inputValue, parentId);
                 } else {
                     success = add(inputValue, parentId);
                 }
                 if (success) {
                     _setAddMode();
-                    if (input) input.value = '';
                 }
             });
         }
 
-        // Botão Cancelar Edição
         const btnCancel = document.getElementById('btn-cancel-category-edit');
         if (btnCancel) {
             const newCancel = btnCancel.cloneNode(true);
@@ -284,7 +302,6 @@ const CategoryManager = (function () {
             newCancel.addEventListener('click', () => _setAddMode());
         }
 
-        // Tecla Enter no campo de input
         const input = document.getElementById('new-category-input');
         if (input) {
             input.addEventListener('keydown', (e) => {
@@ -298,7 +315,6 @@ const CategoryManager = (function () {
         _renderList();
     }
 
-    // Expõe apenas o necessário para o HTML e outros módulos
     return { init, add, remove, startEdit };
 
 })();
