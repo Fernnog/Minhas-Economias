@@ -1,49 +1,97 @@
-# Motor Financeiro (Minhas Economias)
+# 💰 Minhas Economias - Painel Financeiro Premium
 
-Um aplicativo web de gestão financeira pessoal com arquitetura *mobile-first*, focado em alta performance, usabilidade minimalista e sincronização em tempo real. Construído com JavaScript modular puro (Vanilla JS), o sistema oferece projeção inteligente de gastos recorrentes, controle de orçamentos e uma interface otimizada para navegação via dispositivos móveis.
+Um Progressive Web App (PWA) de gestão financeira pessoal completo, desenvolvido com foco em performance, experiência do usuário (UX) premium (Tema Dark Gold) e arquitetura modular. O aplicativo permite rastrear receitas e despesas, gerenciar orçamentos com barras de progresso, visualizar projeções futuras e analisar o comportamento financeiro através de relatórios avançados.
 
-## 🚀 Principais Funcionalidades
+## ✨ Funcionalidades Principais
 
-* **Dashboard Mobile-First:** Interface focada em ergonomia, com menu de navegação inferior (bottom bar) e carrossel magnético (*scroll-snap*) horizontal para acesso rápido aos orçamentos mais importantes (Pinned Budgets).
-* **Gestão Inteligente de Recorrências:** Lógica avançada para tratar despesas recorrentes, incluindo a capacidade de projetar compras parceladas, aplicar reajustes futuros ou registrar exceções isoladas em meses específicos.
-* **Módulo de Orçamentos Visuais:** Definição de metas financeiras (mensais ou pontuais) com barras de progresso que mudam de cor dinamicamente (Verde, Âmbar, Vermelho) conforme o consumo do saldo.
-* **Sincronização em Nuvem (Offline-Ready):** Integração com Firebase (Authentication e Firestore) que trabalha em conjunto com o `LocalStorage`. O app funciona perfeitamente offline e sincroniza os dados assim que a conexão é estabelecida.
-* **Categorização Dinâmica:** Suporte a gráficos visuais e injeção automática de categorias de fallback (ex: "Sem Categoria").
+### 📊 Dashboard Dinâmico
+* **Visão de Saldos:** Acompanhamento do Saldo Atual e Projeção do Saldo no Final do Mês.
+* **Orçamentos Fixados:** Cards de progresso no painel principal para categorias prioritárias.
+* **Navegação Temporal:** Deslocamento entre meses passados e projeções de meses futuros.
 
-## 🛠 Tecnologias e Arquitetura
+### 💸 Gestão de Lançamentos
+* **Tipos de Lançamento:** Receitas e Despesas.
+* **Inteligência de Recorrência:** Suporte para lançamentos únicos, compras parceladas e contas recorrentes (fixas).
+* **Gestão de Exceções:** Capacidade de editar, reajustar ou cancelar uma ocorrência específica de uma conta recorrente sem quebrar o histórico passado.
+* **Meios de Pagamento:** Rastreamento por método (Débito, Cartão Passaí, Cartão CEF) com interface de "chips" cíclicos.
 
-O projeto adota uma abordagem limpa e sem frameworks pesados, garantindo carregamento rápido e facilidade de manutenção:
+### 🗂️ Gestão Avançada de Categorias
+* **Hierarquia de Grupos:** Categorias são filhas de grandes Macro-Grupos (Moradia, Alimentação, Transporte, etc.).
+* **Gerenciador Integrado:** Adição, edição e exclusão de categorias com proteção contra deleção de categorias do sistema (ex: "Sem Categoria").
+* **Gráficos Agrupados:** O gráfico de barras no Dashboard agrupa despesas automaticamente sob os Macro-Grupos, permitindo expansão (drill-down) para ver as subcategorias.
 
-* **Frontend:** HTML5 Semântico, CSS3 (CSS Variables, Flexbox, CSS Grid) e JavaScript Moderno (ES6+).
-* **Backend / BaaS:** Firebase v10 (Compat API) para Autenticação e Banco de Dados NoSQL (Firestore).
-* **Padrão de Projeto:** Módulos Auto-Executáveis (IIFE - *Immediately Invoked Function Expression*) para isolamento de escopo e responsabilidades.
+### 🎯 Orçamentos Mensais
+* **Definição de Metas:** Estabeleça limites de gastos por categoria (recorrentes ou apenas para um mês específico).
+* **Feedback Visual:** Barras de progresso que mudam de cor (Verde, Amarelo, Vermelho) conforme o consumo do orçamento.
+* **Totalizador:** Acompanhamento do uso global do orçamento do mês.
 
-## 📂 Estrutura de Arquivos (Modularização)
+### 🧾 Extrato Inteligente
+* **Agrupamento Diário:** Lançamentos organizados por dia com cálculo de saldo diário.
+* **Conferência (Check):** Sistema para marcar lançamentos como "conferidos" (simulando conciliação bancária).
+* **Filtros:** Alternância rápida entre visualização de todos, apenas conferidos ou apenas pendentes.
+* **Projeção:** Exibição de contas recorrentes projetadas que ainda não venceram no mês atual.
 
-A lógica de negócios foi separada em domínios específicos para facilitar a escalabilidade:
+### 📈 Centro de Análise Financeira (Relatórios)
+1. **Desvio Orçamentário:** Compara o previsto vs. real, ordenando do maior estouro ao maior saldo.
+2. **Radar de Comprometimento:** Gráfico de barras que projeta o peso de despesas fixas e parcelas para os próximos 6 meses.
+3. **Engessamento da Renda:** Gráfico em anel (Doughnut) indicando qual a porcentagem da renda já comprometida com o básico.
+4. **Gastos por Pagamento:** Totalização de despesas segmentadas pelo método de pagamento escolhido (Débito, Cartões).
 
-| Arquivo | Responsabilidade Principal |
-| :--- | :--- |
-| `index.html` | Estrutura semântica, divisão de *views* (SPA) e templates dos formulários. |
-| `style.css` | Sistema de design minimalista, responsividade e variáveis globais de cor. |
-| `script.js` | Motor central. Gerencia o roteamento de telas, cálculos gerais de saldo, renderização de gráficos, escopo de transações e persistência de preferências de interface (ex: Orçamentos Fixados). |
-| `budget.js` | `BudgetModule`: Lida exclusivamente com o CRUD e a validação de dados de orçamentos e renderização das barras de progresso. |
-| `extract.js` | `ExtractModule`: Processa a exibição temporal das transações, projetando lançamentos futuros na tabela do extrato mensal. |
-| `firebase-service.js` | `FirebaseModule`: Centraliza a autenticação de usuários, escuta de estados (Auth) e o sincronismo bidirecional (Upload/Download) das coleções de dados. |
-| `changelog.js` | Módulo isolado para injeção dinâmica do histórico de versões e notas de atualização no modal da aplicação. |
-
-## 🔄 Evoluções Recentes (v1.0.4)
-
-A aplicação passou por uma recente reestruturação arquitetural de UI/UX com foco no usuário final:
-1. **Pinned Budgets (Orçamentos Fixados):** Implementação de preferências de usuário, permitindo fixar cartões de orçamento específicos na tela inicial. As preferências são salvas localmente e sincronizadas no Firebase (`preferences/pinned`).
-2. **Desacoplamento Visual:** Movimentação de gráficos complexos (Despesas por Categoria) para uma *view* dedicada, limpando a carga cognitiva da página inicial.
-3. **Ergonomia Mobile:** Transição das ações principais para uma barra inferior unificada, facilitando o uso com apenas uma mão.
-
-## ⚙️ Como Executar o Projeto
-
-1. Clone o repositório.
-2. Não há necessidade de processos de build (Node.js/NPM). Sendo *Vanilla*, basta abrir o arquivo `index.html` em qualquer navegador moderno.
-3. Para testar o Firebase localmente e evitar bloqueios de CORS, recomenda-se o uso de extensões como *Live Server* (VS Code) ou hospedar os arquivos estáticos.
+### ☁️ Sincronização em Nuvem (Firebase)
+* **Autenticação:** Login seguro via E-mail/Senha.
+* **Sincronização Real-time:** Backup e sync de Lançamentos, Categorias, Orçamentos e Preferências de UI na nuvem (Firestore).
+* **Persistência Offline:** O app continua funcionando e salvando dados localmente mesmo sem internet, sincronizando automaticamente quando a conexão é restabelecida.
 
 ---
-*Projetado com foco em arquitetura PWA e código limpo.*
+
+## 🛠️ Arquitetura e Tecnologias
+
+O projeto foi construído utilizando **Vanilla JavaScript (ES6+)**, HTML5 e CSS3, sem dependência de frameworks pesados (como React ou Angular), garantindo um carregamento ultrarrápido.
+
+* **Padrão de Projeto:** Modular Pattern (IIFE) para encapsulamento lógico.
+* **Armazenamento:** `localStorage` (Cache Local) + `Firebase Firestore` (Nuvem).
+* **Estilização:** CSS puro com variáveis globais (CSS Custom Properties) para facilidade de manutenção do Tema Premium (Ouro & Creme).
+* **Ícones:** SVG inline para máxima performance e controle de cor.
+
+### Estrutura de Arquivos
+
+* `index.html`: Estrutura principal e chamadas de modais (Dialogs).
+* `style.css`: Estilos globais, temas, responsividade e animações.
+* `js/script.js`: Core da aplicação, gestão de estado global, UI do formulário e Dashboard.
+* `js/category-groups.js`: Motor estático dos Macro-Grupos (Pais).
+* `js/category-manager.js`: CRUD das Categorias e sincronização de vínculos.
+* `js/budget.js`: Lógica do módulo de Orçamentos e barras de progresso.
+* `js/extract.js`: Lógica de renderização do extrato e sistema de conciliação.
+* `js/reports.js`: Lógica de cálculos e UI do Centro de Análise Financeira.
+* `js/payment-config.js`: Central de configurações visuais e lógicas dos Meios de Pagamento.
+* `js/firebase-service.js`: Wrapper de conexão com o Firebase Auth e Firestore.
+* `js/changelog.js`: Controle de versões e histórico de atualizações (Modal de Versão).
+
+---
+
+## 🚀 Como Executar o Projeto Localmente
+
+1. **Clonar o repositório** (ou baixar os arquivos).
+2. **Servidor Local:** Como o projeto utiliza módulos e chamadas de API do Firebase, ele deve ser executado através de um servidor local para evitar bloqueios de CORS (protocolo `file://`).
+   * *Sugestão:* Use a extensão **Live Server** no VS Code.
+   * *Alternativa:* Via terminal com Python: `python -m http.server 8000`
+3. Acessar no navegador: `http://localhost:8000`
+
+### Configuração do Firebase
+O projeto utiliza uma configuração do Firebase via CDN. Para conectar ao seu próprio banco de dados:
+1. Crie um projeto no [Firebase Console](https://console.firebase.google.com/).
+2. Ative o **Authentication** (E-mail/Senha) e o **Firestore Database**.
+3. Substitua o objeto `firebaseConfig` no arquivo `js/firebase-service.js` com as chaves do seu projeto.
+4. (Opcional) Configure as regras de segurança do Firestore para permitir leitura/escrita apenas para usuários autenticados comparando o `uid`.
+
+---
+
+## 🔮 Roadmap / Próximos Passos (Oportunidades Arquiteturais)
+
+- [ ] **Edição de Grupos na UI:** Permitir ao usuário reclassificar o Macro-Grupo de uma categoria existente na tela de Gestão de Categorias.
+- [ ] **Customização de Macro-Grupos:** Permitir a criação de Macro-grupos totalmente customizados pelo usuário (salvos no Firebase).
+- [ ] **Importação/Exportação:** Adicionar capacidade de exportar dados para CSV/Excel.
+- [ ] **Notificações Push (PWA):** Alertar o usuário sobre limites de orçamento atingidos e contas próximas ao vencimento utilizando o Service Worker.
+
+---
+*Desenvolvido com foco na simplicidade, elegância e precisão contábil.*
