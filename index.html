@@ -393,6 +393,17 @@
                                 <span class="report-card-cta">Ver Relatório →</span>
                             </button>
 
+                            <button class="report-launcher-card report-launcher-imprevistos" onclick="ReportsModule.openImprevistosAlert()">
+                                <div class="report-card-icon">
+                                    <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                                        <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+                                    </svg>
+                                </div>
+                                <h4 class="report-card-title">Termômetro de Imprevistos</h4>
+                                <p class="report-card-desc">Monitore a pressão dos gastos inesperados sobre a renda — com alerta visual de sobrecarga orçamentária.</p>
+                                <span class="report-card-cta">Ver Relatório →</span>
+                            </button>
+
                         </div>
                     </div>
                 </section>
@@ -457,6 +468,14 @@
         </div>
         <div id="budget-summary-content" class="report-dialog-body"></div>
     </dialog>
+    <dialog id="report5-dialog" class="report-dialog">
+        <div class="dialog-header">
+            <h3>Termômetro de Imprevistos</h3>
+            <button class="close-dialog" onclick="document.getElementById('report5-dialog').close()">&times;</button>
+        </div>
+        <div id="report5-content" class="report-dialog-body"></div>
+    </dialog>
+
     <div id="toast-container" class="toast-container"></div>
 
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-app-compat.js"></script>
