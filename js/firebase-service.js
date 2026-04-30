@@ -155,9 +155,37 @@ const FirebaseModule = (function() {
             // B) Sincronizar Categorias (via CategoryManager para notificar todos os módulos)
             const catRef = await db.collection('users').doc(uid).collection('categories').get();
             if(!catRef.empty) {
-                const cloudCategories = catRef.docs.map(doc => doc.data().name);
+                const cloudCategories = [];
+                const catDocs = []; // Armazena os objetos completos com parentId
+
+                catRef.docs.forEach(doc => {
+                    const data = doc.data();
+                    cloudCategories.push(data.name);
+                    catDocs.push(data);
+                });
+
+                // 1. Salva a lista plana padrão
                 localStorage.setItem('fin_categories', JSON.stringify(cloudCategories));
-                // CategoryManager reinicia com os dados da nuvem e notifica BudgetModule + updateCategorySelect
+
+                // 2. Reconstrói os vínculos de grupo (fin_category_groups) com base na nuvem
+                if (typeof CategoryGroups !== 'undefined') {
+                    // Carrega a estrutura base limpa
+                    const baseGroups = CategoryGroups.getFixedParents().map(p => ({ ...p, isFixed: true, subcategories: [] }));
+
+                    catDocs.forEach(catData => {
+                        if (catData.parentId) {
+                            const targetGroup = baseGroups.find(g => g.id === catData.parentId);
+                            if (targetGroup && !targetGroup.subcategories.includes(catData.name)) {
+                                targetGroup.subcategories.push(catData.name);
+                            }
+                        }
+                    });
+                    
+                    // Persiste a árvore reconstruída no localStorage
+                    localStorage.setItem('fin_category_groups', JSON.stringify(baseGroups));
+                }
+
+                // CategoryManager reinicia com os dados da nuvem processados
                 if (typeof CategoryManager !== 'undefined') {
                     CategoryManager.init();
                 }
