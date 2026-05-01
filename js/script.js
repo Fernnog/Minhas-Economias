@@ -227,11 +227,20 @@ function init() {
 
     updateCategorySelect();
     
-    if (typeof ExtractModule !== 'undefined') ExtractModule.init();
-    if (typeof BudgetModule !== 'undefined') BudgetModule.init();
+    // --- INÍCIO: Inicialização Segura de Módulos (Try/Catch) ---
+    try {
+        if (typeof ExtractModule !== 'undefined') ExtractModule.init();
+    } catch (error) { console.error('Erro ao iniciar ExtractModule:', error); }
 
-    // Inicia a funcionalidade de cards de sincronização
-    SyncModule.init();
+    try {
+        if (typeof BudgetModule !== 'undefined') BudgetModule.init();
+    } catch (error) { console.error('Erro ao iniciar BudgetModule:', error); }
+
+    try {
+        // Inicia a funcionalidade de cards de sincronização apenas se já existir
+        if (typeof SyncModule !== 'undefined') SyncModule.init();
+    } catch (error) { console.error('Erro ao iniciar SyncModule:', error); }
+    // --- FIM: Inicialização Segura ---
 
     // Picker independente do card de Despesas e Receitas por Categoria
     const chartPicker = document.getElementById('chart-month-picker');
@@ -967,7 +976,8 @@ window.editTransaction = function(id) {
     window.scrollTo({ top: 0, behavior: 'smooth' });
 };
 
-init();
+// A chamada global init() foi removida daqui para evitar o erro TDZ (Temporal Dead Zone).
+// Ela será chamada de forma segura no final do arquivo.
 
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
@@ -1021,14 +1031,27 @@ const SyncModule = (function() {
         });
     }
 
-    // Método para ser chamado após o fetch do Firebase
-    function loadFromCloud(cloudDates) {
-        if(cloudDates) {
-            syncDates = cloudDates;
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(syncDates));
-            updateUI();
+  // Método para ser chamado após o fetch do Firebase
+        function loadFromCloud(cloudDates) {
+            if(cloudDates) {
+                syncDates = cloudDates;
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(syncDates));
+                updateUI();
+            }
         }
-    }
 
-    return { init, saveDate, loadFromCloud };
-})();
+        return { init, saveDate, loadFromCloud };
+    })();
+
+// =========================================================================
+// INICIALIZAÇÃO SEGURA DA APLICAÇÃO (Resolução do erro SyncModule)
+// =========================================================================
+// O evento DOMContentLoaded garante que TODO o arquivo (incluindo o SyncModule)
+// já foi lido pelo navegador antes de tentarmos disparar a função init()
+document.addEventListener('DOMContentLoaded', () => {
+    try {
+        init();
+    } catch (error) {
+        console.error('Falha crítica ao inicializar a aplicação:', error);
+    }
+});
