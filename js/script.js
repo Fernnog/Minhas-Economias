@@ -109,19 +109,14 @@ let dashboardMonthOffset = 0;
 // Estado independente do gráfico de categorias (null = segue o painel)
 let _chartMonth = null; // { year, month } ou null
 
+// === TOAST DELEGATION ===
+// Mantém compatibilidade com chamadas legadas delegando para o módulo central
 window.showToast = function(message) {
-    const container = document.getElementById('toast-container');
-    if (!container) return;
-    const toast = document.createElement('div');
-    toast.className = 'toast';
-    toast.innerText = message;
-    container.appendChild(toast);
-    void toast.offsetWidth;
-    toast.classList.add('show');
-    setTimeout(() => {
-        toast.classList.remove('show');
-        setTimeout(() => toast.remove(), 300);
-    }, 3000);
+    if (typeof ToastModule !== 'undefined') {
+        ToastModule.show(message);
+    } else {
+        console.warn('[Fallback Toast]:', message);
+    }
 };
 
 // === DOM ELEMENTS ===
