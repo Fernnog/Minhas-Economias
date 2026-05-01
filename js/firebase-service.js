@@ -209,6 +209,13 @@ const FirebaseModule = (function() {
                 }
             }
 
+            // --- NOVO: Sincronizar Sync Dates (Cards de Sincronização) ---
+            const syncRef = await db.collection('users').doc(uid).collection('preferences').doc('sync_dates').get();
+            if (syncRef.exists) {
+                const data = syncRef.data();
+                if (typeof SyncModule !== 'undefined') SyncModule.loadFromCloud(data.dates);
+            }
+
             // E) Atualizar a Interface
             if (typeof updateCategorySelect === 'function') updateCategorySelect();
             if (typeof BudgetModule !== 'undefined') BudgetModule.updateCategoryOptions();
