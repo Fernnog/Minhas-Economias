@@ -2,7 +2,7 @@
 <html lang="pt-BR">
 <head>
     <script src="https://cdn.jsdelivr.net/npm/eruda"></script>
-<script>eruda.init();</script>
+    <script>eruda.init();</script>
     
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -25,7 +25,6 @@
 </head>
     
 <body>
-
     <header>
         <div style="display: flex; align-items: center; gap: 12px;">
             <img src="imagens/android-chrome-192x192.png" alt="Logo Minhas Economias" class="app-logo">
@@ -62,20 +61,15 @@
     </header>
 
     <main id="app-container">
-        
         <div id="dashboard-view">
             <div class="dashboard-header">
                 <div class="dashboard-month-nav">
                     <div class="nav-actions">
                         <button id="btn-prev-month" class="icon-btn-small" title="Mês Atual" disabled>
-                            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                                <polyline points="15 18 9 12 15 6"></polyline>
-                            </svg>
+                            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
                         </button>
                         <button id="btn-next-month" class="icon-btn-small" title="Próximo Mês">
-                            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                                <polyline points="9 18 15 12 9 6"></polyline>
-                            </svg>
+                            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
                         </button>
                     </div>
                     <span id="dashboard-month-label" class="dashboard-month-label">Carregando...</span>
@@ -93,8 +87,7 @@
 
             <section class="dashboard-body">
                 <h3 class="section-title">Orçamentos em Destaque</h3>
-                <div id="pinned-budgets-container" class="horizontal-scroll">
-                    </div>
+                <div id="pinned-budgets-container" class="horizontal-scroll"></div>
             </section>
 
             <div class="action-menu bottom-menu">
@@ -109,10 +102,7 @@
                 </button>
                 <button id="btn-graficos" class="icon-btn btn-graficos" title="Gráficos de Despesas" onclick="showView('charts')">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M3 3v18h18" stroke="currentColor"></path>
-                        <path d="M18 17V9" stroke="var(--danger)"></path> 
-                        <path d="M13 17V5" stroke="var(--success)"></path> 
-                        <path d="M8 17v-3" stroke="#2563EB"></path> 
+                        <path d="M3 3v18h18" stroke="currentColor"></path><path d="M18 17V9" stroke="var(--danger)"></path><path d="M13 17V5" stroke="var(--success)"></path><path d="M8 17v-3" stroke="#2563EB"></path> 
                     </svg>
                 </button>
             </div>
@@ -150,14 +140,9 @@
                             
                             <label>Meio de Pagamento</label>
                             <input type="hidden" id="trans-payment-method" value="">
-                            <div id="payment-chip-toggle" class="payment-chip-toggle chip-state-blank" 
-                                 onclick="cyclePaymentMethod()" title="Clique para selecionar o meio de pagamento">
+                            <div id="payment-chip-toggle" class="payment-chip-toggle chip-state-blank" onclick="cyclePaymentMethod()" title="Clique para selecionar o meio de pagamento">
                                 <span class="chip-toggle-icon">
-                                    <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                        <circle cx="12" cy="12" r="9" stroke-dasharray="3 3"></circle>
-                                        <line x1="12" y1="8" x2="12" y2="16"></line>
-                                        <line x1="8" y1="12" x2="16" y2="12"></line>
-                                    </svg>
+                                    <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9" stroke-dasharray="3 3"></circle><line x1="12" y1="8" x2="12" y2="16"></line><line x1="8" y1="12" x2="16" y2="12"></line></svg>
                                 </span>
                                 <span class="chip-toggle-label">Sem método</span>
                             </div>
@@ -192,7 +177,7 @@
                             <label>Vinculada à Categoria Principal</label>
                             <select id="new-category-parent">
                                 <option value="">— Sem vínculo (Outros) —</option>
-                                </select>
+                            </select>
                             <label>Nome da Subcategoria</label>
                             <input type="text" id="new-category" placeholder="Ex: Aluguel, Remédios, Netflix..." required>
                             <button type="submit">Adicionar Subcategoria</button>
@@ -205,16 +190,8 @@
                         <div class="month-selector-header">
                             <h3 id="extract-month-title">Extrato de Lançamentos</h3>
                             <div style="display:flex;gap:0.5rem;align-items:center;">
-                                <button id="btn-filter-extract"
-                                        class="icon-btn-small btn-filter-extract"
-                                        data-filter-mode="0"
-                                        onclick="cycleExtractFilter()"
-                                        title="Filtrar por status de conferência">
-                                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                        <line x1="4" y1="6" x2="20" y2="6"></line>
-                                        <line x1="7" y1="12" x2="17" y2="12"></line>
-                                        <line x1="10" y1="18" x2="14" y2="18"></line>
-                                    </svg>
+                                <button id="btn-filter-extract" class="icon-btn-small btn-filter-extract" data-filter-mode="0" onclick="cycleExtractFilter()" title="Filtrar por status de conferência">
+                                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="6" x2="20" y2="6"></line><line x1="7" y1="12" x2="17" y2="12"></line><line x1="10" y1="18" x2="14" y2="18"></line></svg>
                                 </button>
                                 <button class="icon-btn-small btn-dark-gold" title="Selecionar Mês">
                                     <svg class="calendar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
@@ -223,9 +200,7 @@
                             </div>
                         </div>
                         <div class="table-responsive">
-                            <table id="extract-table">
-                                <tbody id="transaction-list"></tbody>
-                            </table>
+                            <table id="extract-table"><tbody id="transaction-list"></tbody></table>
                         </div>
                     </div>
                 </section>
@@ -264,11 +239,7 @@
                     <details class="card collapsible-card" id="category-manager-panel">
                         <summary>
                             <span style="display:flex; align-items:center; gap:0.5rem;">
-                                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor"
-                                     stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                    <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path>
-                                    <line x1="7" y1="7" x2="7.01" y2="7"></line>
-                                </svg>
+                                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path><line x1="7" y1="7" x2="7.01" y2="7"></line></svg>
                                 Configurar Categorias
                             </span>
                             <svg class="chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
@@ -279,19 +250,10 @@
                                     <input type="hidden" id="category-edit-original" value="" />
                                     <select id="category-manager-parent" class="form-select-sm" required>
                                         <option value="">— Selecione o Grupo Principal —</option>
-                                        </select>
-                                    <input
-                                        type="text"
-                                        id="new-category-input"
-                                        placeholder="Nome da categoria..."
-                                        autocomplete="off"
-                                    />
-                                    <button type="button" id="btn-save-category" class="btn-primary-sm">
-                                        Adicionar
-                                    </button>
-                                    <button type="button" id="btn-cancel-category-edit" class="btn-ghost-sm hidden">
-                                        Cancelar
-                                    </button>
+                                    </select>
+                                    <input type="text" id="new-category-input" placeholder="Nome da categoria..." autocomplete="off"/>
+                                    <button type="button" id="btn-save-category" class="btn-primary-sm">Adicionar</button>
+                                    <button type="button" id="btn-cancel-category-edit" class="btn-ghost-sm hidden">Cancelar</button>
                                 </div>
                                 <ul id="category-list"></ul>
                             </div>
@@ -335,146 +297,53 @@
                     </div>
 
                     <div class="report-hub">
-                        <h3 class="section-title" style="margin-top: 2rem; margin-bottom: 1.2rem;">
-                            Centro de Análise Financeira
-                        </h3>
+                        <h3 class="section-title" style="margin-top: 2rem; margin-bottom: 1.2rem;">Centro de Análise Financeira</h3>
                         <div class="report-cards-grid">
-
                             <button class="report-launcher-card" onclick="ReportsModule.openPaymentMethodReport()">
-                                <div class="report-card-icon">
-                                    <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                                        <rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect>
-                                        <line x1="1" y1="10" x2="23" y2="10"></line>
-                                    </svg>
-                                </div>
+                                <div class="report-card-icon"><svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect><line x1="1" y1="10" x2="23" y2="10"></line></svg></div>
                                 <h4 class="report-card-title">Gastos por Pagamento</h4>
                                 <p class="report-card-desc">Débito, Passaí ou CEF — veja os totais por categoria em qualquer mês.</p>
                                 <span class="report-card-cta">Ver Relatório →</span>
                             </button>
-
                             <button class="report-launcher-card" onclick="ReportsModule.openBudgetDeviation()">
-                                <div class="report-card-icon">
-                                    <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                                        <line x1="18" y1="20" x2="18" y2="10"></line>
-                                        <line x1="12" y1="20" x2="12" y2="4"></line>
-                                        <line x1="6" y1="20" x2="6" y2="14"></line>
-                                        <line x1="2" y1="20" x2="22" y2="20"></line>
-                                    </svg>
-                                </div>
+                                <div class="report-card-icon"><svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line><line x1="2" y1="20" x2="22" y2="20"></line></svg></div>
                                 <h4 class="report-card-title">Desvio Orçamentário</h4>
                                 <p class="report-card-desc">Previsto vs. Real — veja as categorias ordenadas do maior estouro à maior economia.</p>
                                 <span class="report-card-cta">Ver Relatório →</span>
                             </button>
-
                             <button class="report-launcher-card" onclick="ReportsModule.openFutureCommitment()">
-                                <div class="report-card-icon">
-                                    <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                                        <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-                                        <line x1="16" y1="2" x2="16" y2="6"></line>
-                                        <line x1="8" y1="2" x2="8" y2="6"></line>
-                                        <line x1="3" y1="10" x2="21" y2="10"></line>
-                                        <polyline points="8 14 10 16 14 12"></polyline>
-                                    </svg>
-                                </div>
+                                <div class="report-card-icon"><svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line><polyline points="8 14 10 16 14 12"></polyline></svg></div>
                                 <h4 class="report-card-title">Radar de Comprometimento</h4>
                                 <p class="report-card-desc">O peso das parcelas e fixos nos próximos 6 meses — identifique os meses críticos.</p>
                                 <span class="report-card-cta">Ver Relatório →</span>
                             </button>
-
                             <button class="report-launcher-card" onclick="ReportsModule.openIncomeRigidity()">
-                                <div class="report-card-icon">
-                                    <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                                        <circle cx="12" cy="12" r="10"></circle>
-                                        <polyline points="12 6 12 12 16 14"></polyline>
-                                    </svg>
-                                </div>
+                                <div class="report-card-icon"><svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg></div>
                                 <h4 class="report-card-title">Engessamento da Renda</h4>
                                 <p class="report-card-desc">Quanto da sua renda já está comprometida com o básico — diagnóstico imediato de flexibilidade.</p>
                                 <span class="report-card-cta">Ver Relatório →</span>
                             </button>
-
                             <button class="report-launcher-card report-launcher-imprevistos" onclick="ReportsModule.openImprevistosAlert()">
-                                <div class="report-card-icon">
-                                    <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                                        <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
-                                    </svg>
-                                </div>
+                                <div class="report-card-icon"><svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg></div>
                                 <h4 class="report-card-title">Termômetro de Imprevistos</h4>
                                 <p class="report-card-desc">Monitore a pressão dos gastos inesperados sobre a renda — com alerta visual de sobrecarga orçamentária.</p>
                                 <span class="report-card-cta">Ver Relatório →</span>
                             </button>
-
                         </div>
                     </div>
                 </section>
-
             </div>
         </div>
-
     </main>
 
-    <dialog id="report4-dialog" class="report-dialog">
-        <div class="dialog-header">
-            <h3>Gastos por Meio de Pagamento</h3>
-            <button class="close-dialog" onclick="document.getElementById('report4-dialog').close()">&times;</button>
-        </div>
-        <div id="report4-content" class="report-dialog-body"></div>
-    </dialog>
-
-    <dialog id="changelog-modal">
-        <div class="dialog-header">
-            <h3>Histórico de Evolução</h3>
-            <button class="close-dialog" onclick="document.getElementById('changelog-modal').close()">&times;</button>
-        </div>
-        <div id="changelog-content"></div>
-    </dialog>
-
-    <dialog id="report1-dialog" class="report-dialog">
-        <div class="dialog-header">
-            <h3>Desvio Orçamentário — Previsto vs. Real</h3>
-            <button class="close-dialog" onclick="document.getElementById('report1-dialog').close()">&times;</button>
-        </div>
-        <div id="report1-content" class="report-dialog-body"></div>
-    </dialog>
-
-    <dialog id="report2-dialog" class="report-dialog">
-        <div class="dialog-header">
-            <h3>Radar de Comprometimento — Próximos 6 Meses</h3>
-            <button class="close-dialog" onclick="document.getElementById('report2-dialog').close()">&times;</button>
-        </div>
-        <div id="report2-content" class="report-dialog-body"></div>
-    </dialog>
-
-    <dialog id="report3-dialog" class="report-dialog">
-        <div class="dialog-header">
-            <h3>Mapa de Engessamento da Renda</h3>
-            <button class="close-dialog" onclick="document.getElementById('report3-dialog').close()">&times;</button>
-        </div>
-        <div id="report3-content" class="report-dialog-body"></div>
-    </dialog>
-
-    <dialog id="category-transactions-dialog" class="report-dialog">
-        <div class="dialog-header">
-            <h3 id="category-transactions-title">Lançamentos da Categoria</h3>
-            <button class="close-dialog" onclick="document.getElementById('category-transactions-dialog').close()">&times;</button>
-        </div>
-        <div id="category-transactions-content" class="report-dialog-body"></div>
-    </dialog>
-
-    <dialog id="budget-summary-dialog" class="report-dialog">
-        <div class="dialog-header">
-            <h3 id="budget-summary-title">Resumo do Grupo</h3>
-            <button class="close-dialog" onclick="document.getElementById('budget-summary-dialog').close()">&times;</button>
-        </div>
-        <div id="budget-summary-content" class="report-dialog-body"></div>
-    </dialog>
-    <dialog id="report5-dialog" class="report-dialog">
-        <div class="dialog-header">
-            <h3>Termômetro de Imprevistos</h3>
-            <button class="close-dialog" onclick="document.getElementById('report5-dialog').close()">&times;</button>
-        </div>
-        <div id="report5-content" class="report-dialog-body"></div>
-    </dialog>
+    <dialog id="report4-dialog" class="report-dialog"><div class="dialog-header"><h3>Gastos por Meio de Pagamento</h3><button class="close-dialog" onclick="document.getElementById('report4-dialog').close()">&times;</button></div><div id="report4-content" class="report-dialog-body"></div></dialog>
+    <dialog id="changelog-modal"><div class="dialog-header"><h3>Histórico de Evolução</h3><button class="close-dialog" onclick="document.getElementById('changelog-modal').close()">&times;</button></div><div id="changelog-content"></div></dialog>
+    <dialog id="report1-dialog" class="report-dialog"><div class="dialog-header"><h3>Desvio Orçamentário — Previsto vs. Real</h3><button class="close-dialog" onclick="document.getElementById('report1-dialog').close()">&times;</button></div><div id="report1-content" class="report-dialog-body"></div></dialog>
+    <dialog id="report2-dialog" class="report-dialog"><div class="dialog-header"><h3>Radar de Comprometimento — Próximos 6 Meses</h3><button class="close-dialog" onclick="document.getElementById('report2-dialog').close()">&times;</button></div><div id="report2-content" class="report-dialog-body"></div></dialog>
+    <dialog id="report3-dialog" class="report-dialog"><div class="dialog-header"><h3>Mapa de Engessamento da Renda</h3><button class="close-dialog" onclick="document.getElementById('report3-dialog').close()">&times;</button></div><div id="report3-content" class="report-dialog-body"></div></dialog>
+    <dialog id="category-transactions-dialog" class="report-dialog"><div class="dialog-header"><h3 id="category-transactions-title">Lançamentos da Categoria</h3><button class="close-dialog" onclick="document.getElementById('category-transactions-dialog').close()">&times;</button></div><div id="category-transactions-content" class="report-dialog-body"></div></dialog>
+    <dialog id="budget-summary-dialog" class="report-dialog"><div class="dialog-header"><h3 id="budget-summary-title">Resumo do Grupo</h3><button class="close-dialog" onclick="document.getElementById('budget-summary-dialog').close()">&times;</button></div><div id="budget-summary-content" class="report-dialog-body"></div></dialog>
+    <dialog id="report5-dialog" class="report-dialog"><div class="dialog-header"><h3>Termômetro de Imprevistos</h3><button class="close-dialog" onclick="document.getElementById('report5-dialog').close()">&times;</button></div><div id="report5-content" class="report-dialog-body"></div></dialog>
 
     <div id="toast-container" class="toast-container"></div>
 
@@ -482,14 +351,334 @@
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore-compat.js"></script>
     
-   <script src="js/payment-config.js"></script>
+    <script src="js/payment-config.js"></script>
     <script src="js/firebase-service.js"></script>
     <script src="js/changelog.js"></script>
     <script src="js/category-groups.js"></script>
     <script src="js/category-manager.js"></script>
     <script src="js/budget.js"></script>
     <script src="js/extract.js"></script>
-    <script src="js/script.js"></script>
     <script src="js/reports.js"></script>
+
+    <script>
+    // === LÓGICA INLINE UNIFICADA (Substitui script.js conforme Diretriz de Arquitetura) ===
+    let transactions = JSON.parse(localStorage.getItem('fin_transactions')) || [];
+    let categories = JSON.parse(localStorage.getItem('fin_categories')) || ['Alimentação', 'Moradia', 'Transporte', 'Salário', 'Lazer'];
+    let pinnedBudgets = JSON.parse(localStorage.getItem('fin_pinned_budgets')) || [];
+
+    window.getMonthExpenses = function(mesAlvo, anoAlvo) {
+        const expenses = {};
+        transactions.forEach(t => {
+            if (t.type !== 'despesa') return;
+            if (t.category.toLowerCase() === 'sem categoria') return;
+            const d = new Date(t.date + 'T00:00:00');
+            const tMonth = d.getMonth();
+            const tYear = d.getFullYear();
+
+            if (tYear === anoAlvo && tMonth === mesAlvo) {
+                const mesStr = `${anoAlvo}-${String(mesAlvo + 1).padStart(2, '0')}`;
+                if (t.skippedDates && t.skippedDates.some(sd => sd.startsWith(mesStr))) return;
+                expenses[t.category] = (expenses[t.category] || 0) + t.amount;
+                return;
+            }
+
+            if (t.isRecurring && (tYear < anoAlvo || (tYear === anoAlvo && tMonth < mesAlvo))) {
+                if (t.recurrenceEndDate && new Date(anoAlvo, mesAlvo, 1) >= new Date(t.recurrenceEndDate)) return;
+                const mesStr = `${anoAlvo}-${String(mesAlvo + 1).padStart(2, '0')}`;
+                if (t.skippedDates && t.skippedDates.some(sd => sd.startsWith(mesStr))) return;
+                expenses[t.category] = (expenses[t.category] || 0) + t.amount;
+            }
+        });
+        return expenses;
+    };
+
+    window.getMonthIncome = function(mesAlvo, anoAlvo) {
+        const income = {};
+        transactions.forEach(t => {
+            if (t.type !== 'receita') return;
+            const d = new Date(t.date + 'T00:00:00');
+            if (d.getFullYear() === anoAlvo && d.getMonth() === mesAlvo) {
+                income[t.category] = (income[t.category] || 0) + t.amount;
+                return;
+            }
+            if (t.isRecurring && (d.getFullYear() < anoAlvo || (d.getFullYear() === anoAlvo && d.getMonth() < mesAlvo))) {
+                if (t.recurrenceEndDate && new Date(anoAlvo, mesAlvo, 1) >= new Date(t.recurrenceEndDate)) return;
+                income[t.category] = (income[t.category] || 0) + t.amount;
+            }
+        });
+        return income;
+    };
+
+    window.cyclePaymentMethod = function() {
+        const hiddenInput = document.getElementById('trans-payment-method');
+        const toggleEl = document.getElementById('payment-chip-toggle');
+        if (!hiddenInput || !toggleEl) return;
+        const currentIndex = window.PAYMENT_CYCLE.indexOf(hiddenInput.value);
+        const nextValue = window.PAYMENT_CYCLE[(currentIndex + 1) % window.PAYMENT_CYCLE.length];
+        window.setPaymentChip(nextValue);
+        toggleEl.style.transform = "scale(0.95)";
+        setTimeout(() => toggleEl.style.transform = "", 100);
+    };
+
+    window.setPaymentChip = function(value) {
+        const hiddenInput = document.getElementById('trans-payment-method');
+        const toggleEl = document.getElementById('payment-chip-toggle');
+        if (!hiddenInput || !toggleEl) return;
+        const safeValue = window.PAYMENT_CYCLE.includes(value) ? value : '';
+        const config = window.PAYMENT_CONFIG[safeValue];
+        hiddenInput.value = safeValue;
+        window.PAYMENT_CYCLE.forEach(m => toggleEl.classList.remove(window.PAYMENT_CONFIG[m].clsToggle));
+        toggleEl.classList.add(config.clsToggle);
+        toggleEl.innerHTML = `<span class="chip-toggle-icon">${config.svg}</span><span class="chip-toggle-label">${config.label}</span>`;
+    };
+
+    let dashboardMonthOffset = 0;
+    let _chartMonth = null;
+
+    window.showToast = function(message) {
+        const container = document.getElementById('toast-container');
+        if (!container) return;
+        const toast = document.createElement('div');
+        toast.className = 'toast';
+        toast.innerText = message;
+        container.appendChild(toast);
+        void toast.offsetWidth;
+        toast.classList.add('show');
+        setTimeout(() => { toast.classList.remove('show'); setTimeout(() => toast.remove(), 300); }, 3000);
+    };
+
+    function lockRecurrenceField(value) {
+        const sel = document.getElementById('trans-recurrence-type');
+        if (sel) { sel.value = value; sel.classList.add('select-locked'); }
+        const pc = document.getElementById('parcelas-container');
+        if (pc) pc.classList.add('hidden');
+    }
+
+    function unlockRecurrenceField() {
+        const sel = document.getElementById('trans-recurrence-type');
+        if (sel) sel.classList.remove('select-locked');
+    }
+
+    function notifyCategoryChange() {
+        saveData();
+        updateCategorySelect();
+        if (typeof BudgetModule !== 'undefined' && BudgetModule.updateCategoryOptions) BudgetModule.updateCategoryOptions();
+    }
+
+    document.getElementById('trans-recurrence-type')?.addEventListener('change', (e) => {
+        const pc = document.getElementById('parcelas-container');
+        if(pc) e.target.value === 'parcelada' ? pc.classList.remove('hidden') : pc.classList.add('hidden');
+    });
+
+    document.getElementById('trans-amount')?.addEventListener('input', function(e) {
+        let value = e.target.value.replace(/\D/g, "");
+        if (value === "") { e.target.value = ""; return; }
+        value = (parseInt(value) / 100).toFixed(2) + "";
+        e.target.value = value.replace(".", ",").replace(/(\d)(\d{3})(\d{3}),/g, "$1.$2.$3,").replace(/(\d)(\d{3}),/g, "$1.$2,");
+    });
+
+    function populateCategoryGroups() {
+        if (typeof CategoryGroups === 'undefined') return;
+        const opts = '<option value="">— Sem vínculo (Outros) —</option>' + CategoryGroups.getFixedParents().map(p => `<option value="${p.id}">${p.name}</option>`).join('');
+        const p1 = document.getElementById('category-manager-parent'), p2 = document.getElementById('new-category-parent');
+        if (p1) p1.innerHTML = opts; if (p2) p2.innerHTML = opts;
+    }
+
+    function init() {
+        document.querySelectorAll('dialog').forEach(d => d.addEventListener('click', e => { if (e.target === d) d.close(); }));
+        document.getElementById('btn-next-month')?.addEventListener('click', () => { if (dashboardMonthOffset < 1) { dashboardMonthOffset++; updateDashboardData(); } });
+        document.getElementById('btn-prev-month')?.addEventListener('click', () => { if (dashboardMonthOffset > 0) { dashboardMonthOffset--; updateDashboardData(); } });
+
+        if (!categories.includes('Sem Categoria')) { categories.push('Sem Categoria'); notifyCategoryChange(); }
+        populateCategoryGroups();
+        if (typeof CategoryManager !== 'undefined') CategoryManager.init();
+        updateCategorySelect();
+        if (typeof ExtractModule !== 'undefined') ExtractModule.init();
+        if (typeof BudgetModule !== 'undefined') BudgetModule.init();
+
+        const chartPicker = document.getElementById('chart-month-picker');
+        if (chartPicker) {
+            const hoje = new Date();
+            chartPicker.value = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}`;
+            chartPicker.addEventListener('change', (e) => {
+                if (!e.target.value) return;
+                const [y, m] = e.target.value.split('-');
+                _chartMonth = { year: parseInt(y), month: parseInt(m) - 1 };
+                _renderChartContent(_chartMonth.month, _chartMonth.year);
+                _updateChartMonthChip(_chartMonth.month, _chartMonth.year);
+            });
+        }
+        updateAllViews();
+    }
+
+    window.showDashboard = function() {
+        document.getElementById('management-view').classList.add('hidden');
+        document.getElementById('dashboard-view').classList.remove('hidden');
+        updateAllViews();
+    };
+
+    window.showView = function(targetView) {
+        document.getElementById('dashboard-view').classList.add('hidden');
+        document.getElementById('management-view').classList.remove('hidden');
+        ['view-form', 'view-extract', 'view-budget', 'view-charts'].forEach(v => document.getElementById(v)?.classList.add('hidden'));
+        document.getElementById(`view-${targetView}`)?.classList.remove('hidden');
+        if (targetView === 'budget' && typeof BudgetModule !== 'undefined') BudgetModule.render();
+        if (targetView === 'charts') updateDashboardData(); 
+    };
+
+    function saveData() {
+        localStorage.setItem('fin_transactions', JSON.stringify(transactions));
+        localStorage.setItem('fin_categories', JSON.stringify(categories));
+    }
+
+    function updateAllViews() {
+        updateDashboardData();
+        if (typeof ExtractModule !== 'undefined') ExtractModule.render();
+        // TRIGGER DOS ALERTAS DE IMPREVISTOS
+        if (typeof ReportsModule !== 'undefined' && ReportsModule.checkImprevistosMilestones) {
+            ReportsModule.checkImprevistosMilestones();
+        }
+    }
+
+    function updateDashboardData() {
+        const hoje = new Date(), dataVisualizada = new Date(hoje.getFullYear(), hoje.getMonth() + dashboardMonthOffset, 1);
+        const mesAtual = dataVisualizada.getMonth(), anoAtual = dataVisualizada.getFullYear(), isMesCorrente = dashboardMonthOffset === 0;
+
+        const monthLabel = document.getElementById('dashboard-month-label');
+        if (monthLabel) monthLabel.textContent = dataVisualizada.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }).replace(/^\w/, c => c.toUpperCase());
+
+        const btnPrev = document.getElementById('btn-prev-month'), btnNext = document.getElementById('btn-next-month');
+        if (btnPrev) btnPrev.disabled = isMesCorrente; if (btnNext) btnNext.disabled = dashboardMonthOffset >= 1;
+
+        let saldoAtualTotal = 0, saldoFimMesTotal = 0;
+        const gastosPorCategoria = getMonthExpenses(mesAtual, anoAtual);
+
+        transactions.forEach(t => {
+            let addDate = t.date;
+            const d = new Date(t.date + 'T00:00:00');
+            if (t.isRecurring && (d.getFullYear() < anoAtual || (d.getFullYear() === anoAtual && d.getMonth() < mesAtual))) {
+                if (!t.recurrenceEndDate || new Date(anoAtual, mesAtual, d.getDate()) < new Date(t.recurrenceEndDate)) {
+                    addDate = `${anoAtual}-${String(mesAtual + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+                }
+            }
+            const dataTrans = new Date(addDate + 'T00:00:00');
+            const isMesmoMes = dataTrans.getMonth() === mesAtual && dataTrans.getFullYear() === anoAtual;
+            const val = t.type === 'receita' ? t.amount : -t.amount;
+            if (isMesCorrente && dataTrans <= hoje) saldoAtualTotal += val;
+            if (dataTrans <= hoje || isMesmoMes) saldoFimMesTotal += val;
+        });
+
+        const dAtual = document.getElementById('saldo-atual-display'), dFim = document.getElementById('saldo-fim-mes-display');
+        if (dAtual) dAtual.innerText = saldoAtualTotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+        if (dFim) dFim.innerText = saldoFimMesTotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
+        renderPinnedBudgets(gastosPorCategoria, mesAtual, anoAtual);
+        const targetMes = _chartMonth ? _chartMonth.month : mesAtual;
+        const targetAno = _chartMonth ? _chartMonth.year : anoAtual;
+        _updateChartMonthChip(targetMes, targetAno);
+        _renderChartContent(targetMes, targetAno);
+    }
+
+    function _updateChartMonthChip(mes, ano) {
+        const chip = document.getElementById('chart-month-chip');
+        if (chip) chip.textContent = new Date(ano, mes, 1).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }).replace(/^\w/, c => c.toUpperCase());
+    }
+
+    function _renderChartContent(mes, ano) {
+        const chartContainer = document.getElementById('category-chart'), totalsContainer = document.getElementById('category-chart-totals');
+        if (!chartContainer || !totalsContainer) return;
+        const gastos = window.getMonthExpenses(mes, ano), receitas = window.getMonthIncome(mes, ano);
+        const totalExp = Object.values(gastos).reduce((s, v) => s + v, 0), totalInc = Object.values(receitas).reduce((s, v) => s + v, 0);
+        
+        totalsContainer.innerHTML = `
+            <div class="chart-total-item"><span class="chart-total-label">Receitas</span><span class="chart-total-value income">${totalInc.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span></div>
+            <div class="chart-total-item"><span class="chart-total-label">Despesas</span><span class="chart-total-value expense">${totalExp.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span></div>
+        `;
+        chartContainer.innerHTML = '';
+        if (totalExp === 0 && totalInc === 0) chartContainer.innerHTML = '<p style="text-align:center; color:#888; font-size:0.9rem;">Nenhum lançamento registrado.</p>';
+    }
+
+    function updateCategorySelect() {
+        const sel = document.getElementById('trans-category');
+        if (!sel) return;
+        sel.innerHTML = '';
+        if (typeof CategoryGroups !== 'undefined') {
+            CategoryGroups.getGroups().forEach(g => {
+                const subs = g.subcategories.filter(s => categories.includes(s));
+                if (subs.length === 0) return;
+                const optgroup = document.createElement('optgroup'); optgroup.label = g.name;
+                subs.sort().forEach(cat => optgroup.innerHTML += `<option value="${cat}">${cat}</option>`);
+                sel.appendChild(optgroup);
+            });
+            sel.innerHTML += `<option value="Sem Categoria">Sem Categoria</option>`;
+        }
+    }
+
+    function renderPinnedBudgets(gastosDoMes, mesAtual, anoAtual) {
+        const container = document.getElementById('pinned-budgets-container');
+        if (!container) return;
+        const rawBudgets = JSON.parse(localStorage.getItem('fin_budgets')) || [];
+        container.innerHTML = pinnedBudgets.map(cat => {
+            const budget = rawBudgets.find(b => b.category === cat && (b.type === 'mensal' || b.targetMonth === `${anoAtual}-${String(mesAtual + 1).padStart(2, '0')}`));
+            const limit = budget ? budget.amount : 0, spent = gastosDoMes[cat] || 0;
+            const percent = limit > 0 ? Math.min((spent / limit) * 100, 100) : (spent > 0 ? 100 : 0);
+            return `
+                <div class="pinned-card">
+                    <div class="pinned-card-header">
+                        <span class="pinned-category-chip">${cat}</span>
+                        <span>${spent.toLocaleString('pt-BR', {style: 'currency', currency: 'BRL'})} / ${limit ? limit.toLocaleString('pt-BR', {style: 'currency', currency: 'BRL'}) : 'Sem Meta'}</span>
+                    </div>
+                    <div class="progress-track" style="height: 8px;"><div class="progress-fill ${percent > 90 ? 'status-danger' : (percent > 70 ? 'status-warning' : 'status-ok')}" style="width: ${percent}%;"></div></div>
+                </div>`;
+        }).join('');
+    }
+
+    document.getElementById('transaction-form').addEventListener('submit', function(e) {
+        e.preventDefault();
+        const id = document.getElementById('trans-id').value, type = document.getElementById('trans-type').value, 
+              rawAmount = document.getElementById('trans-amount').value, amount = parseFloat(rawAmount.replace(/\./g, '').replace(',', '.')), 
+              category = document.getElementById('trans-category').value, date = document.getElementById('trans-date').value, 
+              desc = document.getElementById('trans-desc').value, paymentMethod = document.getElementById('trans-payment-method')?.value || '', 
+              recurrenceType = document.getElementById('trans-recurrence-type') ? document.getElementById('trans-recurrence-type').value : 'unica';
+        
+        const txData = { id: id || Date.now().toString(), type, amount, category, date, desc, isRecurring: (recurrenceType === 'recorrente'), paymentMethod };
+        id ? transactions[transactions.findIndex(t => t.id === id)] = txData : transactions.push(txData);
+        
+        saveData();
+        if (typeof FirebaseModule !== 'undefined') FirebaseModule.syncData('transactions', txData);
+        updateAllViews();
+        this.reset();
+        unlockRecurrenceField();
+        window.setPaymentChip('');
+        showToast(id ? 'Lançamento atualizado!' : 'Lançamento salvo!');
+        showDashboard();
+    });
+
+    window.deleteTransaction = function(id) {
+        if (confirm('Deseja excluir este lançamento?')) {
+            transactions = transactions.filter(t => t.id !== id);
+            saveData();
+            if (typeof FirebaseModule !== 'undefined') FirebaseModule.deleteData('transactions', id);
+            updateAllViews();
+        }
+    };
+
+    window.editTransaction = function(id) {
+        const trans = transactions.find(t => t.id === id);
+        if (!trans) return;
+        document.getElementById('trans-id').value = trans.id;
+        document.getElementById('trans-type').value = trans.type;
+        document.getElementById('trans-amount').value = trans.amount.toFixed(2).replace('.', ',');
+        document.getElementById('trans-category').value = trans.category;
+        document.getElementById('trans-date').value = trans.date;
+        document.getElementById('trans-desc').value = trans.desc;
+        window.setPaymentChip(trans.paymentMethod || ''); 
+        trans.isRecurring ? lockRecurrenceField('recorrente') : unlockRecurrenceField();
+        document.getElementById('btn-save').innerText = 'Atualizar Lançamento';
+        showView('form');
+    };
+
+    init();
+    </script>
 </body>
 </html>
