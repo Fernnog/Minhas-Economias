@@ -209,13 +209,6 @@ const FirebaseModule = (function() {
                 }
             }
 
-            // D.2) Sincronizar Preferências (Imprevistos Alerts)
-            const imprevAlertsRef = await db.collection('users').doc(uid).collection('preferences').doc('imprev_alerts').get();
-            if (imprevAlertsRef.exists) {
-                const data = imprevAlertsRef.data();
-                localStorage.setItem('fin_imprev_alerts', JSON.stringify(data.history || {}));
-            }
-
             // E) Atualizar a Interface
             if (typeof updateCategorySelect === 'function') updateCategorySelect();
             if (typeof BudgetModule !== 'undefined') BudgetModule.updateCategoryOptions();

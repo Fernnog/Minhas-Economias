@@ -1,710 +1,1023 @@
-// ===================================================
-// REPORTS MODULE — Centro de Análise Financeira
-// Depende de: fin_transactions e fin_budgets no localStorage
-// Depende de: PAYMENT_CONFIG em payment-config.js
-// ===================================================
+// === STATE MANAGEMENT ===
+let transactions = JSON.parse(localStorage.getItem('fin_transactions')) || [];
+let categories = JSON.parse(localStorage.getItem('fin_categories')) || ['Alimentação', 'Moradia', 'Transporte', 'Salário', 'Lazer'];
+let pinnedBudgets = JSON.parse(localStorage.getItem('fin_pinned_budgets')) || [];
 
-const ReportsModule = (function () {
+/**
+ * FUNÇÃO UTILITÁRIA GLOBAL — Fonte Única da Verdade para Gastos Mensais
+ */
+window.getMonthExpenses = function(mesAlvo, anoAlvo) {
+    const expenses = {};
+    transactions.forEach(t => {
+        if (t.type !== 'despesa') return;
+        if (t.category.toLowerCase() === 'sem categoria') return;
 
-    let _pmState = { year: null, month: null, method: 'debito' };
+        const d = new Date(t.date + 'T00:00:00');
+        const tMonth = d.getMonth();
+        const tYear = d.getFullYear();
+
+        if (tYear === anoAlvo && tMonth === mesAlvo) {
+            const mesStr = `${anoAlvo}-${String(mesAlvo + 1).padStart(2, '0')}`;
+            if (t.skippedDates && t.skippedDates.some(sd => sd.startsWith(mesStr))) return;
+            expenses[t.category] = (expenses[t.category] || 0) + t.amount;
+            return;
+        }
+
+        if (t.isRecurring && (tYear < anoAlvo || (tYear === anoAlvo && tMonth < mesAlvo))) {
+            if (t.recurrenceEndDate) {
+                const fim = new Date(t.recurrenceEndDate);
+                if (new Date(anoAlvo, mesAlvo, 1) >= fim) return;
+            }
+            const mesStr = `${anoAlvo}-${String(mesAlvo + 1).padStart(2, '0')}`;
+            if (t.skippedDates && t.skippedDates.some(sd => sd.startsWith(mesStr))) return;
+            expenses[t.category] = (expenses[t.category] || 0) + t.amount;
+        }
+    });
+    return expenses;
+};
+
+/**
+ * FUNÇÃO UTILITÁRIA GLOBAL — Receitas por Categoria num mês/ano
+ */
+window.getMonthIncome = function(mesAlvo, anoAlvo) {
+    const income = {};
+    transactions.forEach(t => {
+        if (t.type !== 'receita') return;
+        const d = new Date(t.date + 'T00:00:00');
+        const tMonth = d.getMonth();
+        const tYear  = d.getFullYear();
+
+        if (tYear === anoAlvo && tMonth === mesAlvo) {
+            income[t.category] = (income[t.category] || 0) + t.amount;
+            return;
+        }
+        if (t.isRecurring && (tYear < anoAlvo || (tYear === anoAlvo && tMonth < mesAlvo))) {
+            if (t.recurrenceEndDate) {
+                const fim = new Date(t.recurrenceEndDate);
+                if (new Date(anoAlvo, mesAlvo, 1) >= fim) return;
+            }
+            income[t.category] = (income[t.category] || 0) + t.amount;
+        }
+    });
+    return income;
+};
+
+window.cyclePaymentMethod = function() {
+    const hiddenInput = document.getElementById('trans-payment-method');
+    const toggleEl   = document.getElementById('payment-chip-toggle');
+    if (!hiddenInput || !toggleEl) return;
+
+    const currentIndex = PAYMENT_CYCLE.indexOf(hiddenInput.value);
+    const nextIndex    = (currentIndex + 1) % PAYMENT_CYCLE.length;
+    const nextValue    = PAYMENT_CYCLE[nextIndex];
+    const config       = PAYMENT_CONFIG[nextValue];
+
+    hiddenInput.value = nextValue;
+
+    PAYMENT_CYCLE.forEach(m => toggleEl.classList.remove(PAYMENT_CONFIG[m].clsToggle));
+    toggleEl.classList.add(config.clsToggle);
+
+    toggleEl.innerHTML = `
+        <span class="chip-toggle-icon">${config.svg}</span>
+        <span class="chip-toggle-label">${config.label}</span>
+    `;
     
-    // === NOVO ESTADO DE NAVEGAÇÃO PARA RELATÓRIO 5 ===
-    let _imprevState = { year: null, month: null };
+    toggleEl.style.transform = "scale(0.95)";
+    setTimeout(() => toggleEl.style.transform = "", 100);
+};
 
-    // --- HELPERS INTERNOS ---
+window.setPaymentChip = function(value) {
+    const hiddenInput = document.getElementById('trans-payment-method');
+    const toggleEl   = document.getElementById('payment-chip-toggle');
+    if (!hiddenInput || !toggleEl) return;
 
-    function _fmt(value) {
-        return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+    const safeValue = PAYMENT_CYCLE.includes(value) ? value : '';
+    const config    = PAYMENT_CONFIG[safeValue];
+
+    hiddenInput.value = safeValue;
+    PAYMENT_CYCLE.forEach(m => toggleEl.classList.remove(PAYMENT_CONFIG[m].clsToggle));
+    toggleEl.classList.add(config.clsToggle);
+    toggleEl.innerHTML = `
+        <span class="chip-toggle-icon">${config.svg}</span>
+        <span class="chip-toggle-label">${config.label}</span>
+    `;
+};
+
+// === NAVEGAÇÃO E UTILS ===
+let dashboardMonthOffset = 0;
+
+// Estado independente do gráfico de categorias (null = segue o painel)
+let _chartMonth = null; // { year, month } ou null
+
+window.showToast = function(message) {
+    const container = document.getElementById('toast-container');
+    if (!container) return;
+    const toast = document.createElement('div');
+    toast.className = 'toast';
+    toast.innerText = message;
+    container.appendChild(toast);
+    void toast.offsetWidth;
+    toast.classList.add('show');
+    setTimeout(() => {
+        toast.classList.remove('show');
+        setTimeout(() => toast.remove(), 300);
+    }, 3000);
+};
+
+// === DOM ELEMENTS ===
+const form = document.getElementById('transaction-form');
+const categorySelect = document.getElementById('trans-category');
+const categoryForm = document.getElementById('category-form');
+const recurrenceSelect = document.getElementById('trans-recurrence-type');
+const parcelasContainer = document.getElementById('parcelas-container');
+const amountInput = document.getElementById('trans-amount');
+const dashboardView = document.getElementById('dashboard-view');
+const managementView = document.getElementById('management-view');
+
+// === UTILITÁRIO: TRAVA VISUAL DO CAMPO TIPO DE REPETIÇÃO ===
+
+/**
+ * Exibe o valor correto do tipo de repetição e bloqueia o campo visualmente,
+ * pois no modo de edição ele não tem influência funcional.
+ * @param {'recorrente'|'parcelada'|'unica'} value - Valor a ser exibido
+ */
+function lockRecurrenceField(value) {
+    const sel = document.getElementById('trans-recurrence-type');
+    if (!sel) return;
+    sel.value = value;
+    sel.classList.add('select-locked');
+    // Garante que o container de parcelas não apareça desnecessariamente
+    if (parcelasContainer) parcelasContainer.classList.add('hidden');
+}
+
+/**
+ * Restaura o campo ao estado interativo padrão (usado após salvar/resetar).
+ */
+function unlockRecurrenceField() {
+    const sel = document.getElementById('trans-recurrence-type');
+    if (!sel) return;
+    sel.classList.remove('select-locked');
+}
+
+// =========================================================
+
+function notifyCategoryChange() {
+    saveData();
+    updateCategorySelect();
+    if (typeof BudgetModule !== 'undefined' && typeof BudgetModule.updateCategoryOptions === 'function') {
+        BudgetModule.updateCategoryOptions();
+    }
+}
+
+if(recurrenceSelect) {
+    recurrenceSelect.addEventListener('change', (e) => {
+        e.target.value === 'parcelada' ? parcelasContainer.classList.remove('hidden') : parcelasContainer.classList.add('hidden');
+    });
+}
+
+if (amountInput) {
+    amountInput.addEventListener('input', function(e) {
+        let value = e.target.value.replace(/\D/g, "");
+        if (value === "") { e.target.value = ""; return; }
+        value = (parseInt(value) / 100).toFixed(2) + "";
+        value = value.replace(".", ",");
+        value = value.replace(/(\d)(\d{3})(\d{3}),/g, "$1.$2.$3,");
+        value = value.replace(/(\d)(\d{3}),/g, "$1.$2,");
+        e.target.value = value;
+    });
+}
+
+function populateCategoryGroups() {
+    if (typeof CategoryGroups === 'undefined') return;
+    
+    const parents = CategoryGroups.getFixedParents();
+    const optionsHTML = '<option value="">— Sem vínculo (Outros) —</option>' + 
+        parents.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
+
+    const selectPainel = document.getElementById('category-manager-parent');
+    const selectForm = document.getElementById('new-category-parent');
+    
+    if (selectPainel) selectPainel.innerHTML = optionsHTML;
+    if (selectForm) selectForm.innerHTML = optionsHTML;
+}
+
+function init() {
+    document.querySelectorAll('dialog').forEach(d => {
+        d.addEventListener('click', e => { if (e.target === d) d.close(); });
+    });
+
+    document.getElementById('btn-next-month')?.addEventListener('click', () => {
+        if (dashboardMonthOffset < 1) { dashboardMonthOffset++; updateDashboardData(); }
+    });
+
+    document.getElementById('btn-prev-month')?.addEventListener('click', () => {
+        if (dashboardMonthOffset > 0) { dashboardMonthOffset--; updateDashboardData(); }
+    });
+
+    if (!categories.includes('Sem Categoria')) {
+        categories.push('Sem Categoria');
+        notifyCategoryChange();
     }
 
-    function _getTxns() {
-        return JSON.parse(localStorage.getItem('fin_transactions')) || [];
-    }
+    if (typeof initChangelog === 'function') initChangelog();
+    
+    const headerDate = document.getElementById('header-date');
+    if (headerDate) headerDate.innerText = new Date().toLocaleDateString('pt-BR');
+    
+    const transDate = document.getElementById('trans-date');
+    if (transDate) transDate.valueAsDate = new Date();
+    
+    populateCategoryGroups();
+    
+    // CategoryManager deve iniciar antes dos módulos que consomem 'categories'
+    if (typeof CategoryManager !== 'undefined') CategoryManager.init();
 
-    function _getBudgets() {
-        return JSON.parse(localStorage.getItem('fin_budgets')) || [];
-    }
+    updateCategorySelect();
+    
+    if (typeof ExtractModule !== 'undefined') ExtractModule.init();
+    if (typeof BudgetModule !== 'undefined') BudgetModule.init();
 
-    /**
-     * Calcula a receita total de um mês/ano, incluindo recorrências projetadas.
-     */
-    function _getMonthlyIncome(txns, year, month) {
-        let total = 0;
-        txns.forEach(t => {
-            if (t.type !== 'receita') return;
-            const d = new Date(t.date + 'T00:00:00');
-            const tYear = d.getFullYear(), tMonth = d.getMonth();
-            const isThisMonth = tYear === year && tMonth === month;
-            const isRecurring = t.isRecurring && (tYear < year || (tYear === year && tMonth < month));
-            if (isRecurring && t.recurrenceEndDate) {
-                if (new Date(year, month, 1) >= new Date(t.recurrenceEndDate)) return;
-            }
-            if (isThisMonth || isRecurring) total += t.amount;
+    // Picker independente do card de Despesas e Receitas por Categoria
+    const chartPicker = document.getElementById('chart-month-picker');
+    if (chartPicker) {
+        const hoje = new Date();
+        chartPicker.value = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}`;
+        chartPicker.addEventListener('change', (e) => {
+            if (!e.target.value) return;
+            const [y, m] = e.target.value.split('-');
+            _chartMonth = { year: parseInt(y), month: parseInt(m) - 1 };
+            _renderChartContent(_chartMonth.month, _chartMonth.year);
+            _updateChartMonthChip(_chartMonth.month, _chartMonth.year);
         });
-        return total;
     }
 
-    /**
-     * Calcula despesas agrupadas por categoria para um mês/ano específico.
-     */
-    function _getMonthlyExpenses(txns, year, month) {
-        const expenses = {};
-        txns.forEach(t => {
-            if (t.type !== 'despesa') return;
-            const d = new Date(t.date + 'T00:00:00');
-            const tYear = d.getFullYear();
-            const tMonth = d.getMonth();
+    updateAllViews();
+}
 
-            if (tYear === year && tMonth === month) {
-                expenses[t.category] = (expenses[t.category] || 0) + t.amount;
-                return;
-            }
-            if (t.isRecurring && (tYear < year || (tYear === year && tMonth < month))) {
-                if (t.recurrenceEndDate) {
-                    const fim = new Date(t.recurrenceEndDate);
-                    if (new Date(year, month, 1) >= fim) return;
-                }
-                expenses[t.category] = (expenses[t.category] || 0) + t.amount;
-            }
-        });
-        return expenses;
+window.showDashboard = function() {
+    managementView.classList.add('hidden');
+    dashboardView.classList.remove('hidden');
+    updateAllViews();
+};
+
+window.showView = function(targetView) {
+    dashboardView.classList.add('hidden');
+    managementView.classList.remove('hidden');
+    const subViews = ['view-form', 'view-extract', 'view-budget', 'view-charts'];
+    subViews.forEach(viewId => {
+        const viewEl = document.getElementById(viewId);
+        if (viewEl) viewEl.classList.add('hidden');
+    });
+    const targetEl = document.getElementById(`view-${targetView}`);
+    if (targetEl) targetEl.classList.remove('hidden');
+    if (targetView === 'budget' && typeof BudgetModule !== 'undefined') BudgetModule.render();
+    if (targetView === 'charts') updateDashboardData(); 
+};
+
+function saveData() {
+    localStorage.setItem('fin_transactions', JSON.stringify(transactions));
+    localStorage.setItem('fin_categories', JSON.stringify(categories));
+}
+
+function updateAllViews() {
+    updateDashboardData();
+    if (typeof ExtractModule !== 'undefined') ExtractModule.render();
+}
+
+function updateDashboardData() {
+    const hoje = new Date();
+    const anoBase = hoje.getFullYear();
+    const mesBase = hoje.getMonth();
+    const dataVisualizada = new Date(anoBase, mesBase + dashboardMonthOffset, 1);
+    const mesAtual = dataVisualizada.getMonth();
+    const anoAtual = dataVisualizada.getFullYear();
+    const isMesCorrente = dashboardMonthOffset === 0;
+
+    const monthLabel = document.getElementById('dashboard-month-label');
+    if (monthLabel) {
+        const nomeMes = dataVisualizada.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+        monthLabel.textContent = nomeMes.charAt(0).toUpperCase() + nomeMes.slice(1);
     }
 
-    // ===================================================
-    // RELATÓRIO 1: DESVIO ORÇAMENTÁRIO
-    // ===================================================
-    function openBudgetDeviation() {
-        const content = document.getElementById('report1-content');
-        if (!content) return;
+    const animatableCards = [document.getElementById('card-saldo-atual'), document.getElementById('card-saldo-mes')].filter(Boolean);
+    animatableCards.forEach(card => {
+        card.classList.remove('card-animating');
+        void card.offsetWidth; 
+        card.classList.add('card-animating');
+    });
 
-        content.innerHTML = `
-            <div class="skeleton-line" style="width: 80%;"></div>
-            <div class="skeleton-line" style="width: 60%;"></div>
-            <div class="skeleton-line" style="width: 70%;"></div>
-        `;
-        document.getElementById('report1-dialog').showModal();
+    const btnPrev = document.getElementById('btn-prev-month');
+    const btnNext = document.getElementById('btn-next-month');
+    if (btnPrev) btnPrev.disabled = isMesCorrente;
+    if (btnNext) btnNext.disabled = dashboardMonthOffset >= 1;
 
-        requestAnimationFrame(() => {
-            const today = new Date();
-            const year = today.getFullYear();
-            const month = today.getMonth();
-            const monthStr = `${year}-${String(month + 1).padStart(2, '0')}`;
+    const cardAtualEl = document.getElementById('card-saldo-atual');
+    if (cardAtualEl) isMesCorrente ? cardAtualEl.classList.remove('hidden') : cardAtualEl.classList.add('hidden');
 
-            const budgets = _getBudgets();
-            const txns = _getTxns();
-            const expenses = _getMonthlyExpenses(txns, year, month);
+    const cardSaldoMesLabel = document.getElementById('card-saldo-mes-label');
+    const cardMesEl = document.getElementById('card-saldo-mes');
+    if (cardSaldoMesLabel) cardSaldoMesLabel.textContent = isMesCorrente ? 'Projeção Final do Mês' : 'Saldo Final Previsto';
+    if (cardMesEl) isMesCorrente ? cardMesEl.classList.remove('future-month') : cardMesEl.classList.add('future-month');
 
-            const activeBudgets = budgets.filter(b =>
-                b.type === 'mensal' || b.targetMonth === monthStr
-            );
+    let saldoAtualTotal = 0;
+    let saldoFimMesTotal = 0;
+    const gastosPorCategoria = getMonthExpenses(mesAtual, anoAtual);
+    const todasTransacoes = [];
 
-            if (activeBudgets.length === 0) {
-                content.innerHTML = `<p class="report-empty">Nenhum orçamento configurado para este mês.<br>
-                    <small>Configure seus limites na aba de Orçamentos para ativar este relatório.</small></p>`;
-                return;
-            }
+    transactions.forEach(t => {
+        const d = new Date(t.date + 'T00:00:00');
+        const tMonth = d.getMonth();
+        const tYear = d.getFullYear();
+        todasTransacoes.push(t);
 
-            const rows = activeBudgets.map(b => {
-                const spent = expenses[b.category] || 0;
-                const diff = b.amount - spent; 
-                return { category: b.category, spent, limit: b.amount, diff };
-            }).sort((a, b) => a.diff - b.diff);
-
-            content.innerHTML = `
-                <div class="report-table">
-                    ${rows.map(r => {
-                        const isOver = r.diff < 0;
-                        const isNoData = r.spent === 0 && r.diff === r.limit;
-                        const pillClass = isNoData ? 'pill-neutral' : (isOver ? 'pill-danger' : 'pill-success');
-                        const pillSign = isOver ? '−' : '+';
-                        const pillText = isNoData ? 'Sem gastos' : `${pillSign} ${_fmt(Math.abs(r.diff))}`;
-                        return `
-                            <div class="report-row">
-                                <span class="report-row-name">${r.category}</span>
-                                <span class="report-row-values">
-                                    <span>${_fmt(r.spent)}</span>
-                                    <span class="separator">/</span>
-                                    <span>${_fmt(r.limit)}</span>
-                                </span>
-                                <span class="report-pill ${pillClass}">${pillText}</span>
-                            </div>
-                        `;
-                    }).join('')}
-                </div>
-                <p style="font-size:0.78rem; color:var(--text-light); margin-top:1.2rem; text-align:center;">
-                    Ordenado do maior estouro ao maior saldo.
-                </p>
-            `;
-        });
-    }
-
-    // ===================================================
-    // RELATÓRIO 2: RADAR DE COMPROMETIMENTO FUTURO
-    // ===================================================
-    function openFutureCommitment() {
-        const content = document.getElementById('report2-content');
-        if (!content) return;
-
-        content.innerHTML = `
-            <div class="skeleton-line" style="width: 100%; height: 2.5rem;"></div>
-            <div class="skeleton-line" style="width: 90%; height: 2.5rem;"></div>
-            <div class="skeleton-line" style="width: 95%; height: 2.5rem;"></div>
-        `;
-        document.getElementById('report2-dialog').showModal();
-
-        requestAnimationFrame(() => {
-            const today = new Date();
-            const txns = _getTxns();
-
-            const months = Array.from({ length: 6 }, (_, i) => {
-                const d = new Date(today.getFullYear(), today.getMonth() + i, 1);
-                return { year: d.getFullYear(), month: d.getMonth() };
-            });
-
-            const data = months.map(({ year, month }) => {
-                let fixed = 0;
-                let variable = 0;
-
-                txns.forEach(t => {
-                    if (t.type !== 'despesa') return;
-                    const d = new Date(t.date + 'T00:00:00');
-                    const tYear = d.getFullYear();
-                    const tMonth = d.getMonth();
-
-                    if (t.isRecurring) {
-                        if (tYear < year || (tYear === year && tMonth <= month)) {
-                            if (t.recurrenceEndDate) {
-                                const fim = new Date(t.recurrenceEndDate);
-                                if (new Date(year, month, 1) >= fim) return;
-                            }
-                            fixed += t.amount;
-                        }
-                    } else {
-                        if (tYear === year && tMonth === month) {
-                            variable += t.amount;
-                        }
-                    }
+        if (t.isRecurring && (tYear < anoAtual || (tYear === anoAtual && tMonth < mesAtual))) {
+            const mesStr = `${anoAtual}-${String(mesAtual + 1).padStart(2, '0')}`;
+            if (t.skippedDates && t.skippedDates.some(sd => sd.startsWith(mesStr))) return;
+            const dataProjetada = new Date(anoAtual, mesAtual, d.getDate());
+            const dataTermino = t.recurrenceEndDate ? new Date(t.recurrenceEndDate) : null;
+            if (!dataTermino || dataProjetada < dataTermino) {
+                todasTransacoes.push({
+                    ...t,
+                    date: `${anoAtual}-${String(mesAtual + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
                 });
+            }
+        }
+    });
 
-                return { year, month, fixed, variable, total: fixed + variable };
+    todasTransacoes.forEach(trans => {
+        const dataTrans = new Date(trans.date + 'T00:00:00');
+        const isMesmoMes = dataTrans.getMonth() === mesAtual && dataTrans.getFullYear() === anoAtual;
+        if (isMesCorrente && dataTrans <= hoje) {
+            trans.type === 'receita' ? saldoAtualTotal += trans.amount : saldoAtualTotal -= trans.amount;
+        }
+        if (dataTrans <= hoje || isMesmoMes) {
+            trans.type === 'receita' ? saldoFimMesTotal += trans.amount : saldoFimMesTotal -= trans.amount;
+        }
+    });
+
+    const saldoAtualDisplay = document.getElementById('saldo-atual-display');
+    const saldoFimMesDisplay = document.getElementById('saldo-fim-mes-display');
+    if (saldoAtualDisplay) saldoAtualDisplay.innerText = saldoAtualTotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+    if (saldoFimMesDisplay) saldoFimMesDisplay.innerText = saldoFimMesTotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
+    if (cardAtualEl) saldoAtualTotal < 0 ? cardAtualEl.classList.add('negative') : cardAtualEl.classList.remove('negative');
+    if (cardMesEl) saldoFimMesTotal < 0 ? cardMesEl.classList.add('negative') : cardMesEl.classList.remove('negative');
+
+    renderCategoryIncomeExpenseChart(gastosPorCategoria, mesAtual, anoAtual);
+    renderPinnedBudgets(gastosPorCategoria, mesAtual, anoAtual);
+}
+
+function renderCategoryIncomeExpenseChart(gastos, mes, ano) {
+    // Se o chart tem mês independente selecionado, usa ele (exceto para sincronizar chip inicial)
+    const targetMes = (_chartMonth !== null) ? _chartMonth.month : mes;
+    const targetAno = (_chartMonth !== null) ? _chartMonth.year  : ano;
+
+    _updateChartMonthChip(targetMes, targetAno);
+    _renderChartContent(targetMes, targetAno);
+}
+
+function _updateChartMonthChip(mes, ano) {
+    const chip = document.getElementById('chart-month-chip');
+    if (!chip) return;
+    const nome = new Date(ano, mes, 1).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+    chip.textContent = nome.charAt(0).toUpperCase() + nome.slice(1);
+}
+
+// Variante local que inclui "Sem Categoria" — usada apenas no card do gráfico
+function _getMonthExpensesAll(mesAlvo, anoAlvo) {
+    const expenses = {};
+    transactions.forEach(t => {
+        if (t.type !== 'despesa') return;
+        const d = new Date(t.date + 'T00:00:00');
+        const tMonth = d.getMonth();
+        const tYear  = d.getFullYear();
+
+        if (tYear === anoAlvo && tMonth === mesAlvo) {
+            const mesStr = `${anoAlvo}-${String(mesAlvo + 1).padStart(2, '0')}`;
+            if (t.skippedDates && t.skippedDates.some(sd => sd.startsWith(mesStr))) return;
+            expenses[t.category] = (expenses[t.category] || 0) + t.amount;
+            return;
+        }
+        if (t.isRecurring && (tYear < anoAlvo || (tYear === anoAlvo && tMonth < mesAlvo))) {
+            if (t.recurrenceEndDate) {
+                const fim = new Date(t.recurrenceEndDate);
+                if (new Date(anoAlvo, mesAlvo, 1) >= fim) return;
+            }
+            const mesStr = `${anoAlvo}-${String(mesAlvo + 1).padStart(2, '0')}`;
+            if (t.skippedDates && t.skippedDates.some(sd => sd.startsWith(mesStr))) return;
+            expenses[t.category] = (expenses[t.category] || 0) + t.amount;
+        }
+    });
+    return expenses;
+}
+
+/**
+ * Expande/recolhe as linhas-filho de um grupo no gráfico de categorias.
+ * @param {string} groupId
+ */
+function _toggleGroupRows(groupId) {
+    const children = document.querySelectorAll(`[data-child-of="${groupId}"]`);
+    const chevron  = document.getElementById(`chv-${groupId}`);
+    const isOpen   = chevron && chevron.textContent.trim() === '▼';
+
+    children.forEach(row => {
+        if (isOpen) {
+            row.classList.add('hidden');
+        } else {
+            row.classList.remove('hidden');
+            // Anima as barras filhas ao expandir
+            setTimeout(() => {
+                row.querySelectorAll('[data-target-width]').forEach(bar => {
+                    bar.style.width = bar.getAttribute('data-target-width');
+                });
+            }, 30);
+        }
+    });
+
+    if (chevron) chevron.textContent = isOpen ? '▶' : '▼';
+}
+
+function _renderChartContent(mes, ano) {
+    const chartContainer  = document.getElementById('category-chart');
+    const totalsContainer = document.getElementById('category-chart-totals');
+    if (!chartContainer || !totalsContainer) return;
+
+    const fmt = v => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
+    const gastos  = _getMonthExpensesAll(mes, ano);
+    const receitas = getMonthIncome(mes, ano);
+
+    const totalExp = Object.values(gastos).reduce((s, v) => s + v, 0);
+    const totalInc = Object.values(receitas).reduce((s, v) => s + v, 0);
+    const saldo    = totalInc - totalExp;
+    const saldoClass = saldo >= 0 ? 'balance-pos' : 'balance-neg';
+
+    // --- Totais ---
+    totalsContainer.innerHTML = `
+        <div class="chart-total-item">
+            <span class="chart-total-label">Receitas</span>
+            <span class="chart-total-value income">${fmt(totalInc)}</span>
+        </div>
+        <div class="chart-total-item">
+            <span class="chart-total-label">Despesas</span>
+            <span class="chart-total-value expense">${fmt(totalExp)}</span>
+        </div>
+        <div class="chart-total-item">
+            <span class="chart-total-label">Saldo</span>
+            <span class="chart-total-value ${saldoClass}">${fmt(saldo)}</span>
+        </div>
+    `;
+
+    chartContainer.innerHTML = '';
+
+    // --- Bloco Receitas por Categoria ---
+    const catsInc = Object.keys(receitas).sort((a, b) => receitas[b] - receitas[a]);
+    if (catsInc.length > 0) {
+        const maxInc = receitas[catsInc[0]];
+        const blockInc = document.createElement('div');
+        blockInc.className = 'chart-section-block';
+        blockInc.innerHTML = `<div class="chart-section-title">Receitas por Categoria</div>`;
+        catsInc.forEach(cat => {
+            const valor = receitas[cat];
+            const pct   = (valor / maxInc * 100).toFixed(1);
+            const row   = document.createElement('div');
+            row.className = 'bar-row';
+            row.innerHTML = `
+                <div class="bar-label" title="${cat}">${cat}</div>
+                <div class="bar-track"><div class="bar-fill-income" style="width:0%;" data-target-width="${pct}%"></div></div>
+                <div class="bar-value">${fmt(valor)}</div>
+            `;
+            blockInc.appendChild(row);
+        });
+        chartContainer.appendChild(blockInc);
+    }
+
+   // --- Bloco Despesas por Categoria (AGRUPADO) ---
+    if (Object.keys(gastos).length > 0) {
+        const blockExp = document.createElement('div');
+        blockExp.className = 'chart-section-block';
+        blockExp.innerHTML = `<div class="chart-section-title">Despesas por Categoria</div>`;
+
+        const useGroups = typeof CategoryGroups !== 'undefined';
+
+        if (useGroups) {
+            const grouped = CategoryGroups.groupExpenses(gastos);
+            const maxGroupTotal = grouped.length > 0 ? grouped[0].total : 1;
+
+            grouped.forEach((g, idx) => {
+                const pctParent = (g.total / maxGroupTotal * 100).toFixed(1);
+                const groupId   = `grp-${g.parent.id}-${idx}`;
+
+                // Linha do grupo (clicável para expandir)
+                const parentRow = document.createElement('div');
+                parentRow.className = 'bar-row bar-row-parent';
+                parentRow.setAttribute('data-group', groupId);
+                parentRow.style.cursor = 'pointer';
+                parentRow.innerHTML = `
+                    <div class="bar-label bar-label-parent" title="${g.parent.name}" style="color:${g.parent.color}; font-weight:700;">
+                        <span class="group-chevron" id="chv-${groupId}">▶</span>
+                        ${g.parent.name}
+                        <small style="font-weight:400; color:var(--text-light);">(${g.children.length})</small>
+                    </div>
+                    <div class="bar-track">
+                        <div class="bar-fill" style="width:0%; background:${g.parent.color};" data-target-width="${pctParent}%"></div>
+                    </div>
+                    <div class="bar-value" style="color:${g.parent.color};">${fmt(g.total)}</div>
+                `;
+                parentRow.addEventListener('click', () => _toggleGroupRows(groupId));
+                blockExp.appendChild(parentRow);
+
+                // Linhas filhas (recolhidas por padrão)
+                const maxChild = g.children[0]?.value || 1;
+                g.children.forEach(child => {
+                    const pctChild = (child.value / maxChild * 100).toFixed(1);
+                    const childRow = document.createElement('div');
+                    childRow.className = 'bar-row bar-row-child hidden';
+                    childRow.setAttribute('data-child-of', groupId);
+                    childRow.style.paddingLeft = '1rem';
+                    childRow.innerHTML = `
+                        <div class="bar-label" title="${child.name}" style="font-size:0.85rem; color:var(--text-light);">
+                            ↳ ${child.name}
+                        </div>
+                        <div class="bar-track">
+                            <div class="bar-fill bar-fill-child" style="width:0%; background:${g.parent.color}88;" data-target-width="${pctChild}%"></div>
+                        </div>
+                        <div class="bar-value" style="font-size:0.85rem;">${fmt(child.value)}</div>
+                    `;
+                    blockExp.appendChild(childRow);
+                });
             });
 
-            const maxTotal = Math.max(...data.map(d => d.total), 1);
+        } else {
+            // Fallback: comportamento original (flat list)
+            const catsExp = Object.keys(gastos).sort((a, b) => gastos[b] - gastos[a]);
+            const maxExp = gastos[catsExp[0]];
+            catsExp.forEach(cat => {
+                const valor = gastos[cat];
+                const pct   = (valor / maxExp * 100).toFixed(1);
+                const row   = document.createElement('div');
+                row.className = 'bar-row';
+                row.innerHTML = `
+                    <div class="bar-label" title="${cat}">${cat}</div>
+                    <div class="bar-track"><div class="bar-fill" style="width:0%;" data-target-width="${pct}%"></div></div>
+                    <div class="bar-value">${fmt(valor)}</div>
+                `;
+                blockExp.appendChild(row);
+            });
+        }
 
-            content.innerHTML = `
-                <div class="commitment-chart">
-                    ${data.map((d, i) => {
-                        const fixedPct = (d.fixed / maxTotal) * 100;
-                        const varPct = (d.variable / maxTotal) * 100;
-                        const monthName = new Date(d.year, d.month, 1)
-                            .toLocaleDateString('pt-BR', { month: 'short' })
-                            .replace('.', '');
-                        const label = monthName.charAt(0).toUpperCase() + monthName.slice(1);
-                        const isCurrent = i === 0;
-                        return `
-                            <div class="commitment-month-row ${isCurrent ? 'commitment-current-month' : ''}">
-                                <span class="commitment-month-label">${label}</span>
-                                <div class="commitment-bar-track">
-                                    <div class="commitment-segment-fixed"
-                                         style="width: ${fixedPct.toFixed(1)}%"></div>
-                                    <div class="commitment-segment-variable"
-                                         style="width: ${varPct.toFixed(1)}%"></div>
-                                </div>
-                                <span class="commitment-total-label">${_fmt(d.total)}</span>
+        chartContainer.appendChild(blockExp);
+    }
+
+    if (catsInc.length === 0 && Object.keys(gastos).length === 0) {
+        chartContainer.innerHTML = '<p style="text-align:center; color:#888; font-size:0.9rem;">Nenhum lançamento registrado para este mês.</p>';
+    }
+
+    setTimeout(() => {
+        document.querySelectorAll('#category-chart .bar-fill, #category-chart .bar-fill-income').forEach(bar => {
+            bar.style.width = bar.getAttribute('data-target-width');
+        });
+    }, 50);
+}
+
+
+function updateCategorySelect() {
+    if (!categorySelect) return;
+    categorySelect.innerHTML = '';
+
+    const useGroups = typeof CategoryGroups !== 'undefined';
+
+    if (useGroups) {
+        const groups = CategoryGroups.getGroups();
+        const assignedSet = new Set();
+
+        groups.forEach(g => {
+            const subs = g.subcategories.filter(s => categories.includes(s));
+            if (subs.length === 0) return;
+            const optgroup = document.createElement('optgroup');
+            optgroup.label = g.name;
+            subs.sort().forEach(cat => {
+                const opt = document.createElement('option');
+                opt.value = cat;
+                opt.textContent = cat;
+                optgroup.appendChild(opt);
+                assignedSet.add(cat);
+            });
+            categorySelect.appendChild(optgroup);
+        });
+
+        // Categorias sem grupo (legadas)
+        const ungrouped = categories.filter(c => !assignedSet.has(c) && c !== 'Sem Categoria' && c.toLowerCase() !== 'sem category');
+        if (ungrouped.length > 0) {
+            const grpOthers = document.createElement('optgroup');
+            grpOthers.label = 'Outros';
+            ungrouped.sort().forEach(cat => {
+                const opt = document.createElement('option');
+                opt.value = cat;
+                opt.textContent = cat;
+                grpOthers.appendChild(opt);
+            });
+            categorySelect.appendChild(grpOthers);
+        }
+
+        // Sem Categoria sempre por último
+        const optSem = document.createElement('option');
+        optSem.value = 'Sem Categoria';
+        optSem.textContent = 'Sem Categoria';
+        categorySelect.appendChild(optSem);
+
+    } else {
+        // Comportamento original como fallback
+        let uniqueCats = [...new Set(categories.map(c => c.trim()))];
+        const regularCats = uniqueCats.filter(c => c.toLowerCase() !== 'sem category' && c.toLowerCase() !== 'sem categoria').sort();
+        categories = [...regularCats, 'Sem Categoria'];
+        categories.forEach(cat => {
+            const option = document.createElement('option');
+            option.value = cat;
+            option.innerText = cat;
+            categorySelect.appendChild(option);
+        });
+    }
+}
+
+categoryForm?.addEventListener('submit', function(e) {
+    e.preventDefault();
+    const newCatInput  = document.getElementById('new-category');
+    const parentSelect = document.getElementById('new-category-parent'); 
+    if (!newCatInput) return;
+    const newCatName = newCatInput.value.trim();
+    const parentId   = parentSelect ? parentSelect.value : '';
+    if (!newCatName) return;
+
+    // Delega para o CategoryManager — ponto central de criação
+    if (typeof CategoryManager !== 'undefined') {
+        const success = CategoryManager.add(newCatName, parentId); 
+        if (success) {
+            newCatInput.value = '';
+            if (parentSelect) parentSelect.value = '';
+            newCatInput.placeholder = `✅ "${newCatName}" adicionada!`;
+            setTimeout(() => { newCatInput.placeholder = 'Ex: Aluguel, Remédios, Netflix...'; }, 2500);
+        }
+    } else {
+        // Fallback caso o CategoryManager não esteja disponível
+        if (categories.some(c => c.toLowerCase() === newCatName.toLowerCase())) {
+            alert(`A categoria "${newCatName}" já existe.`);
+            return;
+        }
+        categories.push(newCatName);
+        notifyCategoryChange();
+        newCatInput.value = '';
+        if (parentSelect) parentSelect.value = '';
+        newCatInput.placeholder = `✅ "${newCatName}" adicionada!`;
+        setTimeout(() => { newCatInput.placeholder = 'Ex: Aluguel, Remédios, Netflix...'; }, 2500);
+    }
+});
+
+function renderPinnedBudgets(gastosDoMes, mesAtual, anoAtual) {
+    const container = document.getElementById('pinned-budgets-container');
+    if (!container) return;
+    if (mesAtual === undefined) mesAtual = new Date().getMonth();
+    if (anoAtual === undefined) anoAtual = new Date().getFullYear();
+    const rawBudgets = JSON.parse(localStorage.getItem('fin_budgets')) || [];
+    if (pinnedBudgets.length === 0) {
+        container.innerHTML = '<p style="color: var(--text-light); font-size: 0.9rem; width: 100%; text-align: center; padding: 1rem;">Nenhum orçamento fixado. Use a engrenagem para configurar.</p>';
+        return;
+    }
+    const currentYearMonth = `${anoAtual}-${String(mesAtual + 1).padStart(2, '0')}`;
+    container.innerHTML = pinnedBudgets.map(cat => {
+        const budget = rawBudgets.find(b => b.category === cat && (b.type === 'mensal' || b.targetMonth === currentYearMonth));
+        const spent = gastosDoMes[cat] || 0;
+        const limit = budget ? budget.amount : 0;
+        const percent = limit > 0 ? Math.min((spent / limit) * 100, 100) : (spent > 0 ? 100 : 0);
+        let status = limit > 0 ? (percent > 90 ? 'status-danger' : (percent > 70 ? 'status-warning' : 'status-ok')) : (spent > 0 ? 'status-danger' : 'status-ok');
+        return `
+            <div class="pinned-card">
+                <div class="pinned-card-header">
+                    <button
+                        class="pinned-category-btn"
+                        onclick="openCategoryTransactions('${cat.replace(/'/g, "\\'")}', ${mesAtual}, ${anoAtual})"
+                        title="Ver lançamentos de ${cat}">
+                        ${cat}
+                    </button>
+                    <span>${spent.toLocaleString('pt-BR', {style: 'currency', currency: 'BRL'})} / ${limit > 0 ? limit.toLocaleString('pt-BR', {style: 'currency', currency: 'BRL'}) : 'Sem Meta'}</span>
+                </div>
+                <div class="progress-track" style="height: 8px; background: rgba(255, 255, 255, 0.1); border-radius: 4px; overflow: hidden;">
+                    <div class="progress-fill ${status}" style="width: ${percent}%; height: 100%; transition: width 0.5s ease;"></div>
+                </div>
+            </div>`;
+    }).join('');
+}
+
+/**
+ * Retorna todos os lançamentos de despesa de uma categoria num mês/ano,
+ * incluindo recorrentes projetados — espelhando a lógica de getMonthExpenses.
+ * @param {string} category
+ * @param {number} mesAlvo  - índice 0-based
+ * @param {number} anoAlvo
+ * @returns {Array} Lista de objetos de transação (com flag isProjected)
+ */
+function _getMonthTransactionsByCategory(category, mesAlvo, anoAlvo) {
+    const result = [];
+    const mesStr = `${anoAlvo}-${String(mesAlvo + 1).padStart(2, '0')}`;
+
+    transactions.forEach(t => {
+        // Filtra apenas despesas da categoria alvo
+        if (t.type !== 'despesa') return;
+        if (t.category !== category) return;
+
+        const d = new Date(t.date + 'T00:00:00');
+        const tMonth = d.getMonth();
+        const tYear = d.getFullYear();
+
+        // --- Caso 1: Lançamento direto no mês alvo ---
+        if (tYear === anoAlvo && tMonth === mesAlvo) {
+            if (t.skippedDates && t.skippedDates.some(sd => sd.startsWith(mesStr))) return;
+            result.push({ ...t, isProjected: false });
+            return;
+        }
+
+        // --- Caso 2: Recorrente projetado para o mês alvo ---
+        if (t.isRecurring && (tYear < anoAlvo || (tYear === anoAlvo && tMonth < mesAlvo))) {
+            if (t.recurrenceEndDate) {
+                const fim = new Date(t.recurrenceEndDate);
+                if (new Date(anoAlvo, mesAlvo, 1) >= fim) return;
+            }
+            if (t.skippedDates && t.skippedDates.some(sd => sd.startsWith(mesStr))) return;
+            const diaOriginal = String(d.getDate()).padStart(2, '0');
+            result.push({ ...t, date: `${mesStr}-${diaOriginal}`, isProjected: true });
+        }
+    });
+
+    // Ordena por data crescente
+    result.sort((a, b) => new Date(a.date + 'T00:00:00') - new Date(b.date + 'T00:00:00'));
+    return result;
+}
+
+/**
+ * Abre o dialog de lançamentos filtrados por categoria e mês.
+ * Chamado pelo clique no nome da categoria nos cards de orçamento fixado.
+ * @param {string} category
+ * @param {number} mes  - índice 0-based
+ * @param {number} ano
+ */
+window.openCategoryTransactions = function(category, mes, ano) {
+    const dialog   = document.getElementById('category-transactions-dialog');
+    const titleEl  = document.getElementById('category-transactions-title');
+    const contentEl = document.getElementById('category-transactions-content');
+    if (!dialog || !titleEl || !contentEl) return;
+
+    const txs = _getMonthTransactionsByCategory(category, mes, ano);
+    const fmt = v => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+    const dataRef = new Date(ano, mes, 1);
+    const nomeMes = dataRef.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+    const nomeMesCapitalizado = nomeMes.charAt(0).toUpperCase() + nomeMes.slice(1);
+
+    // Título do dialog
+    titleEl.textContent = `${category} — ${nomeMesCapitalizado}`;
+
+    if (txs.length === 0) {
+        contentEl.innerHTML = `
+            <p class="cat-tx-empty">
+                Nenhum lançamento de despesa encontrado para <strong>${category}</strong> neste mês.
+            </p>`;
+    } else {
+        const total = txs.reduce((acc, t) => acc + t.amount, 0);
+        const count = txs.length;
+
+        contentEl.innerHTML = `
+            <div class="cat-tx-summary">
+                <span>${count} lançamento${count !== 1 ? 's' : ''}</span>
+                <span class="cat-tx-total">${fmt(total)}</span>
+            </div>
+            <ul class="cat-tx-list">
+                ${txs.map(t => {
+                    const dataFormatada = new Date(t.date + 'T00:00:00').toLocaleDateString('pt-BR');
+                    const descricao = t.desc ? t.desc : '—';
+                    const badgeHTML = t.isProjected
+                        ? `<span class="cat-tx-badge">Recorrente</span>`
+                        : '';
+                    return `
+                        <li class="cat-tx-item${t.isProjected ? ' projected' : ''}">
+                            <div class="cat-tx-info">
+                                <span class="cat-tx-desc" title="${descricao}">${descricao}</span>
+                                ${badgeHTML}
                             </div>
-                        `;
-                    }).join('')}
-                </div>
-                <div class="chart-legend">
-                    <span class="legend-item">
-                        <span class="legend-dot" style="background:#3d3830;"></span>
-                        Despesas Fixas (recorrentes)
-                    </span>
-                    <span class="legend-item">
-                        <span class="legend-dot" style="background:var(--danger);"></span>
-                        Parcelas / Variáveis
-                    </span>
-                    <span class="legend-item" style="color:var(--primary); font-weight:700;">
-                        ★ Mês atual
-                    </span>
-                </div>
-            `;
-        });
+                            <div class="cat-tx-meta">
+                                <span class="cat-tx-date">${dataFormatada}</span>
+                                <span class="cat-tx-amount">${fmt(t.amount)}</span>
+                            </div>
+                        </li>`;
+                }).join('')}
+            </ul>`;
     }
 
-    // ===================================================
-    // RELATÓRIO 3: MAPA DE ENGESSAMENTO DA RENDA
-    // ===================================================
-    function openIncomeRigidity() {
-        const content = document.getElementById('report3-content');
-        if (!content) return;
+    dialog.showModal();
+};
 
-        content.innerHTML = `
-            <div style="display: flex; gap: 1rem; align-items: center; margin-bottom: 1.5rem;">
-                <div class="skeleton-line" style="width: 120px; height: 120px; border-radius: 50%;"></div>
-                <div style="flex: 1;">
-                    <div class="skeleton-line" style="width: 90%;"></div>
-                    <div class="skeleton-line" style="width: 70%;"></div>
-                    <div class="skeleton-line" style="width: 80%;"></div>
-                </div>
-            </div>
-            <div class="skeleton-line" style="width: 100%; height: 3rem;"></div>
-        `;
-        document.getElementById('report3-dialog').showModal();
+form.addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    const id = document.getElementById('trans-id').value;
+    const type = document.getElementById('trans-type').value;
+    const rawAmount = document.getElementById('trans-amount').value;
+    const amount = parseFloat(rawAmount.replace(/\./g, '').replace(',', '.'));
+    const category = document.getElementById('trans-category').value;
+    const date = document.getElementById('trans-date').value;
+    const desc = document.getElementById('trans-desc').value;
+    const paymentMethod = document.getElementById('trans-payment-method')?.value || '';
+    const recurrenceType = document.getElementById('trans-recurrence-type') ? document.getElementById('trans-recurrence-type').value : 'unica';
+    const isRecurring = (recurrenceType === 'recorrente');
+    const isParcelada = (recurrenceType === 'parcelada');
+    const installments = parseInt(document.getElementById('trans-installments')?.value || 1);
+    const exceptionParent = document.getElementById('trans-exception-parent')?.value;
+    const exceptionDate = document.getElementById('trans-exception-date')?.value;
 
-        requestAnimationFrame(() => {
-            const today = new Date();
-            const year = today.getFullYear();
-            const month = today.getMonth();
-            const txns = _getTxns();
+    const newItemsToSync = [];
 
-            let totalIncome = 0;
-            let fixedExpenses = 0;
-            let variableExpenses = 0;
+    if (id) {
+        const editScope = document.getElementById('trans-edit-scope')?.value;
+        const isInstallmentEdit = id.includes('_');
 
-            txns.forEach(t => {
-                const d = new Date(t.date + 'T00:00:00');
-                const tYear = d.getFullYear(), tMonth = d.getMonth();
-                const isThisMonth = tYear === year && tMonth === month;
-                const isRecurringProjected = t.isRecurring && (tYear < year || (tYear === year && tMonth < month));
+        if (isInstallmentEdit && editScope === 'this_and_future') {
+            const [baseId, currentIndexStr] = id.split('_');
+            const currentIndex = parseInt(currentIndexStr);
 
-                let recurrenceActive = false;
-                if (isRecurringProjected) {
-                    if (t.recurrenceEndDate) {
-                        recurrenceActive = new Date(year, month, 1) < new Date(t.recurrenceEndDate);
-                    } else {
-                        recurrenceActive = true;
-                    }
-                }
-
-                if (!(isThisMonth || recurrenceActive)) return;
-
-                if (t.type === 'receita') {
-                    totalIncome += t.amount;
-                } else if (t.type === 'despesa') {
-                    if (t.isRecurring || recurrenceActive) {
-                        fixedExpenses += t.amount;
-                    } else {
-                        variableExpenses += t.amount;
+            transactions.forEach(t => {
+                if (t.id.startsWith(baseId + '_')) {
+                    const tIndex = parseInt(t.id.split('_')[1]);
+                    if (tIndex >= currentIndex) {
+                        t.amount = amount;
+                        t.type = type;
+                        t.category = category;
+                        t.paymentMethod = paymentMethod;
+                        newItemsToSync.push(t);
                     }
                 }
             });
-
-            const totalExpenses = fixedExpenses + variableExpenses;
-            const grandTotal = Math.max(totalIncome, totalExpenses, 1);
-            const fixedPct = Math.round((fixedExpenses / grandTotal) * 100);
-            const varPct = Math.round((variableExpenses / grandTotal) * 100);
-            const saved = Math.max(totalIncome - totalExpenses, 0);
-            const rigidityPct = totalIncome > 0 ? Math.round((totalExpenses / totalIncome) * 100) : 0;
-
-            const conicGradient = [
-                `#3d3830 0% ${fixedPct}%`,
-                `var(--warning) ${fixedPct}% ${fixedPct + varPct}%`,
-                `var(--success) ${fixedPct + varPct}% 100%`
-            ].join(', ');
-
-            const bannerStatus = rigidityPct > 80 ? 'status-danger' : rigidityPct > 60 ? 'status-warning' : 'status-ok';
-            const rigidityMessage = rigidityPct > 80 ? `⚠ ${rigidityPct}% da sua renda comprometida.` : `${rigidityPct}% da renda comprometida.`;
-
-            content.innerHTML = `
-                <div class="rigidity-section">
-                    <div class="doughnut-wrap">
-                        <div class="doughnut-ring" style="background: conic-gradient(${conicGradient});"></div>
-                    </div>
-                    <div class="doughnut-stats">
-                        <div class="doughnut-stat-item"><span class="doughnut-stat-dot" style="background:#3d3830;"></span><small>Fixas</small><strong>${_fmt(fixedExpenses)}</strong></div>
-                        <div class="doughnut-stat-item"><span class="doughnut-stat-dot" style="background:var(--warning);"></span><small>Variáveis</small><strong>${_fmt(variableExpenses)}</strong></div>
-                        <div class="doughnut-stat-item"><span class="doughnut-stat-dot" style="background:var(--success);"></span><small>Poupado</small><strong>${_fmt(saved)}</strong></div>
-                    </div>
-                </div>
-                <div class="rigidity-index-banner ${bannerStatus}">
-                    <span class="rigidity-index-label">Índice de Engessamento</span>
-                    <span class="rigidity-index-value">${rigidityMessage}</span>
-                </div>
-            `;
-        });
-    }
-
-    // ===================================================
-    // RELATÓRIO 4: GASTOS POR MEIO DE PAGAMENTO
-    // ===================================================
-
-    function _getExpensesByPayment(txns, year, month, method) {
-        const expenses = {};
-        txns.forEach(t => {
-            if (t.type !== 'despesa') return;
-            if ((t.paymentMethod || '') !== method) return;
-
-            const d = new Date(t.date + 'T00:00:00');
-            const tYear = d.getFullYear(), tMonth = d.getMonth();
-
-            if (tYear === year && tMonth === month) {
-                expenses[t.category] = (expenses[t.category] || 0) + t.amount;
-                return;
+        } else {
+            const transactionData = { id, type, amount, category, date, desc, isRecurring, paymentMethod };
+            const index = transactions.findIndex(t => t.id === id);
+            transactions[index] = transactionData;
+            newItemsToSync.push(transactionData);
+        }
+        document.getElementById('btn-save').innerText = 'Salvar Lançamento';
+    } else {
+        if (isParcelada) {
+            const baseDate = new Date(date + 'T00:00:00');
+            for (let i = 0; i < installments; i++) {
+                const instDate = new Date(baseDate);
+                instDate.setMonth(instDate.getMonth() + i);
+                const instData = {
+                    id: Date.now().toString() + "_" + i,
+                    type, amount: amount, 
+                    category, date: instDate.toISOString().split('T')[0], 
+                    desc: `${desc} (${i + 1}/${installments})`, isRecurring: false, paymentMethod
+                };
+                transactions.push(instData);
+                newItemsToSync.push(instData);
             }
-            if (t.isRecurring && (tYear < year || (tYear === year && tMonth < month))) {
-                if (t.recurrenceEndDate && new Date(year, month, 1) >= new Date(t.recurrenceEndDate)) return;
-                expenses[t.category] = (expenses[t.category] || 0) + t.amount;
-            }
-        });
-        return expenses;
-    }
-
-    function _renderReport4(year, month, method) {
-        const content = document.getElementById('report4-content');
-        if (!content) return;
-
-        // ✅ CORREÇÃO: PAYMENT_CONFIG é o objeto direto, sem .methods
-        const config = window.PAYMENT_CONFIG;
-        const txns = _getTxns();
-        const expenses = _getExpensesByPayment(txns, year, month, method);
-        const cats = Object.keys(expenses).sort((a, b) => expenses[b] - expenses[a]);
-        const total = cats.reduce((s, c) => s + expenses[c], 0);
-        const maxVal = cats.length > 0 ? expenses[cats[0]] : 1;
-        const currentMeta = config[method];
-        const monthVal = `${year}-${String(month + 1).padStart(2, '0')}`;
-
-        // ✅ CORREÇÃO: classe ativa montada como 'active-' + m (não d.activeClass)
-        const filterBtns = Object.entries(config)
-            .filter(([m]) => m !== '')
-            .map(([m, d]) => `
-                <button class="payment-filter-btn ${method === m ? 'active-' + m : ''}"
-                        onclick="ReportsModule._pmFilter(${year}, ${month}, '${m}')">
-                    ${d.label}
-                </button>`).join('');
-
-        const rows = cats.length > 0
-            ? cats.map(cat => {
-                const pct = (expenses[cat] / maxVal * 100).toFixed(1);
-                return `
-                    <div class="report-row" style="flex-direction:column; gap:0.3rem; align-items:stretch;">
-                        <div style="display:flex; justify-content:space-between; align-items:center;">
-                            <span class="report-row-name">${cat}</span>
-                            <span style="font-weight:700; color:${currentMeta.color};">${_fmt(expenses[cat])}</span>
-                        </div>
-                        <div style="height:6px; background:var(--border); border-radius:4px; overflow:hidden;">
-                            <div style="height:100%; width:${pct}%; background:${currentMeta.color}; 
-                                        border-radius:4px; transition:width 0.4s ease;"></div>
-                        </div>
-                    </div>`;
-            }).join('')
-            : `<p class="report-empty">Nenhum lançamento via ${currentMeta.label} neste mês.</p>`;
-
-        content.innerHTML = `
-            <div class="report4-month-selector">
-                <label>Mês:</label>
-                <input type="month" value="${monthVal}" onchange="ReportsModule._pmMonth(this.value)">
-            </div>
-            <div class="payment-filter-bar">${filterBtns}</div>
-            <div class="report-table">${rows}</div>
-            ${total > 0 ? `<div class="report4-total-banner">Total via ${currentMeta.label}: <span style="color:${currentMeta.color};">${_fmt(total)}</span></div>` : ''}
-        `;
-    }
-
-    function openPaymentMethodReport() {
-        const content = document.getElementById('report4-content');
-        if (!content) return;
-        content.innerHTML = `
-            <div class="skeleton-line" style="width:50%; height:2rem;"></div>
-            <div class="skeleton-line" style="width:80%;"></div>
-            <div class="skeleton-line" style="width:65%;"></div>
-        `;
-        document.getElementById('report4-dialog').showModal();
-        requestAnimationFrame(() => {
-            const today = new Date();
-            _pmState = { year: today.getFullYear(), month: today.getMonth(), method: 'debito' };
-            _renderReport4(_pmState.year, _pmState.month, _pmState.method);
-        });
-    }
-
-    function _pmFilter(year, month, method) {
-        _pmState.method = method;
-        _renderReport4(year, month, method);
-    }
-
-    function _pmMonth(value) {
-        const [y, m] = value.split('-');
-        _pmState.year = parseInt(y);
-        _pmState.month = parseInt(m) - 1;
-        _renderReport4(_pmState.year, _pmState.month, _pmState.method);
-    }
-
-    // ===================================================
-    // RELATÓRIO 5: TERMÔMETRO DE IMPREVISTOS E ALERTAS
-    // ===================================================
-
-    const IMPREV_MAX_PCT = 25;   // escala máxima da barra = 25% da renda
-    const IMPREV_WARN_PCT = 5;   // limite inferior de atenção
-    const IMPREV_DANGER_PCT = 10; // limite de sobrecarga
-
-    function _imprevStatus(pct) {
-        if (pct < IMPREV_WARN_PCT)   return 'ok';
-        if (pct < IMPREV_DANGER_PCT) return 'warning';
-        return 'danger';
-    }
-
-    function _imprevAlertContent(status, pct, totalImprev, totalIncome) {
-        const map = {
-            ok: {
-                icon: '✔',
-                title: 'Situação Controlada',
-                msg: `Os imprevistos representam <strong>${pct.toFixed(1)}%</strong> da receita — dentro de uma faixa saudável. Continue monitorando para manter o equilíbrio.`
-            },
-            warning: {
-                icon: '⚠',
-                title: 'Zona de Atenção',
-                msg: `Os imprevistos já consomem <strong>${pct.toFixed(1)}%</strong> da receita. Avalie se há gastos que poderiam ser antecipados ou evitados nos próximos meses.`
-            },
-            danger: {
-                icon: '🚨',
-                title: 'Sobrecarga Detectada',
-                msg: `Os imprevistos ultrapassaram <strong>${pct.toFixed(1)}%</strong> da receita — acima do limiar crítico de ${IMPREV_DANGER_PCT}%. Risco real de desequilíbrio no orçamento doméstico.`
-            }
-        };
-        return map[status];
-    }
-
-    // === FUNÇÃO DE VERIFICAÇÃO DE ALERTAS (CHAMADA GLOBALMENTE) ===
-    function checkImprevistosThresholds() {
-        const today = new Date();
-        const year = today.getFullYear();
-        const month = today.getMonth();
-        const monthKey = `${year}-${String(month + 1).padStart(2, '0')}`;
-
-        const txns = _getTxns();
-        const totalIncome = _getMonthlyIncome(txns, year, month);
-
-        if (totalIncome <= 0) return; // Sem renda, sem base para percentual
-
-        // Identifica subcategorias de imprevistos
-        const groups = (typeof CategoryGroups !== 'undefined') ? CategoryGroups.getGroups() :[];
-        const imprevGroup = groups.find(g => g.id === 'imprevistos');
-        const imprevSubs = imprevGroup ? imprevGroup.subcategories :[];
-
-        let totalImprev = 0;
-        txns.forEach(t => {
-            if (t.type !== 'despesa') return;
-            const cat = t.category || '';
-            const isImprev = imprevSubs.includes(cat) || cat.toLowerCase() === 'imprevistos' || (imprevGroup && imprevSubs.length === 0 && cat.toLowerCase() === 'imprevistos');
-            if (!isImprev) return;
-
-            const d = new Date(t.date + 'T00:00:00');
-            const tYear = d.getFullYear(), tMonth = d.getMonth();
-            if (tYear === year && tMonth === month) {
-                totalImprev += t.amount;
-            } else if (t.isRecurring && (tYear < year || (tYear === year && tMonth < month))) {
-                if (t.recurrenceEndDate && new Date(year, month, 1) >= new Date(t.recurrenceEndDate)) return;
-                totalImprev += t.amount;
-            }
-        });
-
-        const pct = (totalImprev / totalIncome) * 100;
-
-        // Recupera histórico de alertas disparados
-        let alertsData = JSON.parse(localStorage.getItem('fin_imprev_alerts')) || {};
-        if (!alertsData[monthKey]) alertsData[monthKey] =[];
-        const triggered = alertsData[monthKey];
-
-        const thresholds =[5, 10, 25, 50];
-        let newlyTriggered = false;
-
-        thresholds.forEach(th => {
-            if (pct >= th && !triggered.includes(th)) {
-                triggered.push(th);
-                newlyTriggered = true;
-                if (typeof showToast === 'function') {
-                    showToast(`🚨 Alerta: Seus imprevistos já alcançaram ${th}% da sua renda mensal!`);
+        } else {
+            if (exceptionParent) {
+                const parentTx = transactions.find(t => t.id === exceptionParent);
+                const editScope = document.getElementById('trans-edit-scope')?.value;
+                if (parentTx) {
+                    if (editScope === 'this_and_future') {
+                        parentTx.recurrenceEndDate = exceptionDate;
+                        newItemsToSync.push(parentTx);
+                        const transactionData = { id: Date.now().toString(), type, amount, category, date, desc, isRecurring: true, paymentMethod };
+                        transactions.push(transactionData);
+                        newItemsToSync.push(transactionData);
+                    } else {
+                        parentTx.skippedDates = parentTx.skippedDates || [];
+                        parentTx.skippedDates.push(exceptionDate);
+                        newItemsToSync.push(parentTx);
+                        const transactionData = { id: Date.now().toString(), type, amount, category, date, desc, isRecurring: false, paymentMethod };
+                        transactions.push(transactionData);
+                        newItemsToSync.push(transactionData);
+                    }
                 }
-            }
-        });
-
-        // Salva local e na nuvem se houve novo disparo
-        if (newlyTriggered) {
-            localStorage.setItem('fin_imprev_alerts', JSON.stringify(alertsData));
-            if (typeof FirebaseModule !== 'undefined') {
-                FirebaseModule.syncData('preferences', { id: 'imprev_alerts', history: alertsData });
+            } else {
+                const transactionData = { id: Date.now().toString(), type, amount, category, date, desc, isRecurring, paymentMethod };
+                transactions.push(transactionData);
+                newItemsToSync.push(transactionData);
             }
         }
     }
 
-    // === FUNÇÕES DE RENDERIZAÇÃO E NAVEGAÇÃO DO RELATÓRIO 5 ===
-    function _imprevMonth(value) {
-        if (!value) return;
-        const[y, m] = value.split('-');
-        _imprevState.year = parseInt(y);
-        _imprevState.month = parseInt(m) - 1;
-        _renderReport5(_imprevState.year, _imprevState.month);
+    saveData();
+    if (typeof FirebaseModule !== 'undefined') newItemsToSync.forEach(t => FirebaseModule.syncData('transactions', t));
+    updateAllViews();
+    form.reset();
+    unlockRecurrenceField(); // ← Restaura o campo após salvar
+    setPaymentChip('');
+    document.getElementById('trans-id').value = '';
+    const transDateInput = document.getElementById('trans-date');
+    if (transDateInput) transDateInput.valueAsDate = new Date();
+    showToast(id ? 'Lançamento atualizado com sucesso!' : 'Novo lançamento salvo!');
+    showDashboard();
+});
+
+window.deleteTransaction = function(id) {
+    if (confirm('Deseja realmente excluir este lançamento?')) {
+        transactions = transactions.filter(t => t.id !== id);
+        saveData();
+        if (typeof FirebaseModule !== 'undefined') FirebaseModule.deleteData('transactions', id);
+        updateAllViews();
+        showToast('Lançamento excluído com sucesso!');
+    }
+};
+
+window.editSingleProjected = function(id, date) {
+    const parentId = id.replace('_proj', '');
+    const parentTx = transactions.find(t => t.id === parentId);
+    if (!parentTx) return;
+
+    document.getElementById('trans-id').value = ''; 
+    document.getElementById('trans-exception-parent').value = parentId;
+    document.getElementById('trans-exception-date').value = date;
+    document.getElementById('trans-type').value = parentTx.type;
+    document.getElementById('trans-amount').value = parentTx.amount.toFixed(2).replace('.', ',');
+    document.getElementById('trans-category').value = parentTx.category;
+    document.getElementById('trans-date').value = date;
+    document.getElementById('trans-desc').value = parentTx.desc;
+
+    // ← ALTERADO: exibe o tipo real e bloqueia o campo (era hardcoded como 'unica')
+    lockRecurrenceField('recorrente');
+    
+    setPaymentChip(parentTx.paymentMethod || '');
+
+    const scopeContainer = document.getElementById('edit-scope-container');
+    if (scopeContainer) scopeContainer.classList.remove('hidden');
+    document.getElementById('btn-save').innerText = 'Salvar Alteração';
+    showView('form');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+};
+
+window.stopRecurrence = function(id, date) {
+    const parentId = id.replace('_proj', '');
+    if (confirm('Deseja interromper esta repetição a partir deste mês? Todos os lançamentos futuros serão cancelados.')) {
+        const parentTx = transactions.find(t => t.id === parentId);
+        if (parentTx) {
+            parentTx.recurrenceEndDate = date;
+            saveData();
+            if (typeof FirebaseModule !== 'undefined') FirebaseModule.syncData('transactions', parentTx);
+            updateAllViews();
+        }
+    }
+};
+
+window.editTransaction = function(id) {
+    const trans = transactions.find(t => t.id === id);
+    if (!trans) return;
+
+    document.getElementById('trans-id').value = trans.id;
+    document.getElementById('trans-type').value = trans.type;
+    document.getElementById('trans-amount').value = trans.amount.toFixed(2).replace('.', ',');
+    document.getElementById('trans-category').value = trans.category;
+    document.getElementById('trans-date').value = trans.date;
+    document.getElementById('trans-desc').value = trans.desc;
+    setPaymentChip(trans.paymentMethod || ''); 
+
+    // ← ALTERADO: lógica de exibição do campo "Tipo de Repetição" no modo de edição
+    const isInstallment = trans.id.includes('_');
+    const scopeContainer = document.getElementById('edit-scope-container');
+
+    if (recurrenceSelect) {
+        if (isInstallment) {
+            // Parcela de compra parcelada: exibe o tipo correto e trava
+            lockRecurrenceField('parcelada');
+        } else if (trans.isRecurring) {
+            // Lançamento recorrente: exibe o tipo correto e trava
+            lockRecurrenceField('recorrente');
+        } else {
+            // Lançamento único sem vínculo: campo funcional, mantém interativo
+            unlockRecurrenceField();
+            recurrenceSelect.value = 'unica';
+            recurrenceSelect.dispatchEvent(new Event('change'));
+        }
+    }
+    
+    if ((trans.isRecurring || isInstallment) && scopeContainer) {
+        scopeContainer.classList.remove('hidden');
+        
+        if (trans.isRecurring) {
+            document.getElementById('trans-id').value = ''; 
+            document.getElementById('trans-exception-parent').value = trans.id;
+            document.getElementById('trans-exception-date').value = trans.date;
+        }
+    } else if (scopeContainer) {
+        scopeContainer.classList.add('hidden');
     }
 
-    function _renderReport5(year, month) {
-        const content = document.getElementById('report5-content');
-        if (!content) return;
+    document.getElementById('btn-save').innerText = 'Atualizar Lançamento';
+    showView('form');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+};
 
-        const txns = _getTxns();
+init();
 
-        // 1. Determinar subcategorias do grupo Imprevistos
-        const groups = (typeof CategoryGroups !== 'undefined') ? CategoryGroups.getGroups() :[];
-        const imprevGroup = groups.find(g => g.id === 'imprevistos');
-        const imprevSubs = imprevGroup ? imprevGroup.subcategories :[];
-
-        // 2. Calcular receita do mês
-        const totalIncome = _getMonthlyIncome(txns, year, month);
-
-        // 3. Calcular despesas de imprevistos por subcategoria
-        const subTotals = {};
-        txns.forEach(t => {
-            if (t.type !== 'despesa') return;
-            const cat = t.category || '';
-            const isImprev = imprevSubs.includes(cat) ||
-                             cat.toLowerCase() === 'imprevistos' ||
-                             (imprevGroup && imprevSubs.length === 0 && cat.toLowerCase() === 'imprevistos');
-
-            if (!isImprev) return;
-
-            const d = new Date(t.date + 'T00:00:00');
-            const tYear = d.getFullYear(), tMonth = d.getMonth();
-            if (tYear === year && tMonth === month) {
-                subTotals[cat] = (subTotals[cat] || 0) + t.amount;
-                return;
-            }
-            if (t.isRecurring && (tYear < year || (tYear === year && tMonth < month))) {
-                if (t.recurrenceEndDate && new Date(year, month, 1) >= new Date(t.recurrenceEndDate)) return;
-                subTotals[cat] = (subTotals[cat] || 0) + t.amount;
-            }
-        });
-
-        const totalImprev = Object.values(subTotals).reduce((s, v) => s + v, 0);
-        const pct = totalIncome > 0 ? (totalImprev / totalIncome) * 100 : 0;
-        const status = _imprevStatus(pct);
-        const alert = _imprevAlertContent(status, pct, totalImprev, totalIncome);
-
-        const markerPos = Math.min((pct / IMPREV_MAX_PCT) * 100, 97).toFixed(1);
-        const warnPos  = (IMPREV_WARN_PCT   / IMPREV_MAX_PCT * 100).toFixed(1);
-        const dangerPos = (IMPREV_DANGER_PCT / IMPREV_MAX_PCT * 100).toFixed(1);
-
-        const sortedSubs = Object.entries(subTotals).sort(([,a], [,b]) => b - a);
-        const maxSubVal = sortedSubs.length > 0 ? sortedSubs[0][1] : 1;
-
-        const subRows = sortedSubs.length > 0
-            ? sortedSubs.map(([name, val]) => {
-                const barPct = (val / maxSubVal * 100).toFixed(1);
-                return `
-                    <div class="imprev-sub-row">
-                        <div class="imprev-sub-header">
-                            <span class="imprev-sub-name">${name}</span>
-                            <span class="imprev-sub-value">${_fmt(val)}</span>
-                        </div>
-                        <div class="imprev-sub-bar-track">
-                            <div class="imprev-sub-bar-fill" style="width:${barPct}%"></div>
-                        </div>
-                    </div>`;
-            }).join('')
-            : `<p class="report-empty" style="padding:1rem 0;">Nenhuma despesa de imprevistos registrada neste mês.</p>`;
-
-        const monthName = new Date(year, month, 1).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
-
-        // Montagem do HTML atualizada com o calendário no cabeçalho
-        content.innerHTML = `
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
-                <p class="imprev-month-label" style="margin: 0; font-size: 1.1rem;">${monthName.charAt(0).toUpperCase() + monthName.slice(1)}</p>
-                <button class="icon-btn-small btn-dark-gold chart-month-picker-btn" title="Selecionar outro mês" style="position: relative;">
-                    <svg class="calendar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-                        <line x1="16" y1="2" x2="16" y2="6"></line>
-                        <line x1="8" y1="2" x2="8" y2="6"></line>
-                        <line x1="3" y1="10" x2="21" y2="10"></line>
-                    </svg>
-                    <input type="month" class="hidden-date-picker" value="${year}-${String(month + 1).padStart(2, '0')}" onchange="ReportsModule._imprevMonth(this.value)">
-                </button>
-            </div>
-
-            <div class="imprev-big-display status-${status}">
-                <span class="imprev-big-pct">${pct.toFixed(1)}<small>%</small></span>
-                <span class="imprev-big-sub">da receita comprometida com imprevistos</span>
-            </div>
-
-            <div class="imprev-gauge-wrap">
-                <div class="imprev-gauge-track">
-                    <div class="imprev-zone imprev-zone-ok"    style="width:${warnPos}%"></div>
-                    <div class="imprev-zone imprev-zone-warn"  style="width:${(dangerPos - warnPos).toFixed(1)}%"></div>
-                    <div class="imprev-zone imprev-zone-over"  style="flex:1"></div>
-                    <div class="imprev-marker" style="left:${markerPos}%">
-                        <div class="imprev-marker-needle"></div>
-                        <div class="imprev-marker-bubble status-bubble-${status}">${pct.toFixed(1)}%</div>
-                    </div>
-                </div>
-                <div class="imprev-gauge-scale">
-                    <span>0%</span>
-                    <span style="position:absolute; left:${warnPos}%; transform:translateX(-50%);">${IMPREV_WARN_PCT}%</span>
-                    <span style="position:absolute; left:${dangerPos}%; transform:translateX(-50%);">${IMPREV_DANGER_PCT}%</span>
-                    <span>${IMPREV_MAX_PCT}%+</span>
-                </div>
-            </div>
-
-            <div class="imprev-alert-banner imprev-alert-${status}">
-                <span class="imprev-alert-icon">${alert.icon}</span>
-                <div class="imprev-alert-body">
-                    <strong>${alert.title}</strong>
-                    <p>${alert.msg}</p>
-                </div>
-            </div>
-
-            <div class="imprev-totals-row">
-                <div class="imprev-total-item">
-                    <small>Total Imprevistos</small>
-                    <strong style="color:var(--danger)">${_fmt(totalImprev)}</strong>
-                </div>
-                <div class="imprev-total-divider"></div>
-                <div class="imprev-total-item">
-                    <small>Receita do Mês</small>
-                    <strong style="color:var(--success)">${_fmt(totalIncome)}</strong>
-                </div>
-            </div>
-
-            ${sortedSubs.length > 0 ? `
-            <div class="imprev-subs-section">
-                <h4 class="imprev-subs-title">Detalhamento por Subcategoria</h4>
-                <div class="imprev-subs-list">${subRows}</div>
-            </div>` : ''}
-
-            ${totalIncome === 0 ? `
-            <p style="font-size:0.8rem; color:var(--text-light); text-align:center; margin-top:1rem;">
-                ⚠ Nenhuma receita registrada neste mês — o percentual não pôde ser calculado.
-            </p>` : ''}
-        `;
-    }
-
-    function openImprevistosAlert() {
-        const content = document.getElementById('report5-content');
-        if (!content) return;
-
-        content.innerHTML = `
-            <div class="skeleton-line" style="width:60%; height:3rem; margin:0 auto 1rem;"></div>
-            <div class="skeleton-line" style="width:100%; height:2.5rem; margin-bottom:1rem;"></div>
-            <div class="skeleton-line" style="width:100%; height:4rem; margin-bottom:1rem;"></div>
-            <div class="skeleton-line" style="width:80%;"></div>
-            <div class="skeleton-line" style="width:65%;"></div>
-        `;
-        document.getElementById('report5-dialog').showModal();
-
-        requestAnimationFrame(() => {
-            const today = new Date();
-            _imprevState = { year: today.getFullYear(), month: today.getMonth() };
-            _renderReport5(_imprevState.year, _imprevState.month);
-        });
-    }
-
-    // API Pública
-    return { 
-        openBudgetDeviation, 
-        openFutureCommitment, 
-        openIncomeRigidity, 
-        openPaymentMethodReport,
-        openImprevistosAlert,
-        _pmFilter,
-        _pmMonth,
-        _imprevMonth,
-        checkImprevistosThresholds
-    };
-
-})();
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js').catch(err => console.error('❌ Falha Service Worker:', err));
+    });
+}
