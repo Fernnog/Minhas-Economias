@@ -213,8 +213,6 @@ function init() {
         categories.push('Sem Categoria');
         notifyCategoryChange();
     }
-
-    if (typeof initChangelog === 'function') initChangelog();
     
     const headerDate = document.getElementById('header-date');
     if (headerDate) headerDate.innerText = new Date().toLocaleDateString('pt-BR');
@@ -231,6 +229,9 @@ function init() {
     
     if (typeof ExtractModule !== 'undefined') ExtractModule.init();
     if (typeof BudgetModule !== 'undefined') BudgetModule.init();
+
+    // Inicia a funcionalidade de cards de sincronização
+    SyncModule.init();
 
     // Picker independente do card de Despesas e Receitas por Categoria
     const chartPicker = document.getElementById('chart-month-picker');
@@ -363,7 +364,6 @@ function updateDashboardData() {
 }
 
 function renderCategoryIncomeExpenseChart(gastos, mes, ano) {
-    // Se o chart tem mês independente selecionado, usa ele (exceto para sincronizar chip inicial)
     const targetMes = (_chartMonth !== null) ? _chartMonth.month : mes;
     const targetAno = (_chartMonth !== null) ? _chartMonth.year  : ano;
 
@@ -378,7 +378,6 @@ function _updateChartMonthChip(mes, ano) {
     chip.textContent = nome.charAt(0).toUpperCase() + nome.slice(1);
 }
 
-// Variante local que inclui "Sem Categoria" — usada apenas no card do gráfico
 function _getMonthExpensesAll(mesAlvo, anoAlvo) {
     const expenses = {};
     transactions.forEach(t => {
@@ -406,10 +405,6 @@ function _getMonthExpensesAll(mesAlvo, anoAlvo) {
     return expenses;
 }
 
-/**
- * Expande/recolhe as linhas-filho de um grupo no gráfico de categorias.
- * @param {string} groupId
- */
 function _toggleGroupRows(groupId) {
     const children = document.querySelectorAll(`[data-child-of="${groupId}"]`);
     const chevron  = document.getElementById(`chv-${groupId}`);
@@ -420,7 +415,6 @@ function _toggleGroupRows(groupId) {
             row.classList.add('hidden');
         } else {
             row.classList.remove('hidden');
-            // Anima as barras filhas ao expandir
             setTimeout(() => {
                 row.querySelectorAll('[data-target-width]').forEach(bar => {
                     bar.style.width = bar.getAttribute('data-target-width');
@@ -447,7 +441,6 @@ function _renderChartContent(mes, ano) {
     const saldo    = totalInc - totalExp;
     const saldoClass = saldo >= 0 ? 'balance-pos' : 'balance-neg';
 
-    // --- Totais ---
     totalsContainer.innerHTML = `
         <div class="chart-total-item">
             <span class="chart-total-label">Receitas</span>
@@ -465,7 +458,6 @@ function _renderChartContent(mes, ano) {
 
     chartContainer.innerHTML = '';
 
-    // --- Bloco Receitas por Categoria ---
     const catsInc = Object.keys(receitas).sort((a, b) => receitas[b] - receitas[a]);
     if (catsInc.length > 0) {
         const maxInc = receitas[catsInc[0]];
@@ -487,7 +479,6 @@ function _renderChartContent(mes, ano) {
         chartContainer.appendChild(blockInc);
     }
 
-   // --- Bloco Despesas por Categoria (AGRUPADO) ---
     if (Object.keys(gastos).length > 0) {
         const blockExp = document.createElement('div');
         blockExp.className = 'chart-section-block';
@@ -503,7 +494,6 @@ function _renderChartContent(mes, ano) {
                 const pctParent = (g.total / maxGroupTotal * 100).toFixed(1);
                 const groupId   = `grp-${g.parent.id}-${idx}`;
 
-                // Linha do grupo (clicável para expandir)
                 const parentRow = document.createElement('div');
                 parentRow.className = 'bar-row bar-row-parent';
                 parentRow.setAttribute('data-group', groupId);
@@ -522,7 +512,6 @@ function _renderChartContent(mes, ano) {
                 parentRow.addEventListener('click', () => _toggleGroupRows(groupId));
                 blockExp.appendChild(parentRow);
 
-                // Linhas filhas (recolhidas por padrão)
                 const maxChild = g.children[0]?.value || 1;
                 g.children.forEach(child => {
                     const pctChild = (child.value / maxChild * 100).toFixed(1);
@@ -544,7 +533,6 @@ function _renderChartContent(mes, ano) {
             });
 
         } else {
-            // Fallback: comportamento original (flat list)
             const catsExp = Object.keys(gastos).sort((a, b) => gastos[b] - gastos[a]);
             const maxExp = gastos[catsExp[0]];
             catsExp.forEach(cat => {
@@ -601,7 +589,6 @@ function updateCategorySelect() {
             categorySelect.appendChild(optgroup);
         });
 
-        // Categorias sem grupo (legadas)
         const ungrouped = categories.filter(c => !assignedSet.has(c) && c !== 'Sem Categoria' && c.toLowerCase() !== 'sem category');
         if (ungrouped.length > 0) {
             const grpOthers = document.createElement('optgroup');
@@ -615,14 +602,12 @@ function updateCategorySelect() {
             categorySelect.appendChild(grpOthers);
         }
 
-        // Sem Categoria sempre por último
         const optSem = document.createElement('option');
         optSem.value = 'Sem Categoria';
         optSem.textContent = 'Sem Categoria';
         categorySelect.appendChild(optSem);
 
     } else {
-        // Comportamento original como fallback
         let uniqueCats = [...new Set(categories.map(c => c.trim()))];
         const regularCats = uniqueCats.filter(c => c.toLowerCase() !== 'sem category' && c.toLowerCase() !== 'sem categoria').sort();
         categories = [...regularCats, 'Sem Categoria'];
@@ -644,7 +629,6 @@ categoryForm?.addEventListener('submit', function(e) {
     const parentId   = parentSelect ? parentSelect.value : '';
     if (!newCatName) return;
 
-    // Delega para o CategoryManager — ponto central de criação
     if (typeof CategoryManager !== 'undefined') {
         const success = CategoryManager.add(newCatName, parentId); 
         if (success) {
@@ -654,7 +638,6 @@ categoryForm?.addEventListener('submit', function(e) {
             setTimeout(() => { newCatInput.placeholder = 'Ex: Aluguel, Remédios, Netflix...'; }, 2500);
         }
     } else {
-        // Fallback caso o CategoryManager não esteja disponível
         if (categories.some(c => c.toLowerCase() === newCatName.toLowerCase())) {
             alert(`A categoria "${newCatName}" já existe.`);
             return;
@@ -703,20 +686,11 @@ function renderPinnedBudgets(gastosDoMes, mesAtual, anoAtual) {
     }).join('');
 }
 
-/**
- * Retorna todos os lançamentos de despesa de uma categoria num mês/ano,
- * incluindo recorrentes projetados — espelhando a lógica de getMonthExpenses.
- * @param {string} category
- * @param {number} mesAlvo  - índice 0-based
- * @param {number} anoAlvo
- * @returns {Array} Lista de objetos de transação (com flag isProjected)
- */
 function _getMonthTransactionsByCategory(category, mesAlvo, anoAlvo) {
     const result = [];
     const mesStr = `${anoAlvo}-${String(mesAlvo + 1).padStart(2, '0')}`;
 
     transactions.forEach(t => {
-        // Filtra apenas despesas da categoria alvo
         if (t.type !== 'despesa') return;
         if (t.category !== category) return;
 
@@ -724,14 +698,12 @@ function _getMonthTransactionsByCategory(category, mesAlvo, anoAlvo) {
         const tMonth = d.getMonth();
         const tYear = d.getFullYear();
 
-        // --- Caso 1: Lançamento direto no mês alvo ---
         if (tYear === anoAlvo && tMonth === mesAlvo) {
             if (t.skippedDates && t.skippedDates.some(sd => sd.startsWith(mesStr))) return;
             result.push({ ...t, isProjected: false });
             return;
         }
 
-        // --- Caso 2: Recorrente projetado para o mês alvo ---
         if (t.isRecurring && (tYear < anoAlvo || (tYear === anoAlvo && tMonth < mesAlvo))) {
             if (t.recurrenceEndDate) {
                 const fim = new Date(t.recurrenceEndDate);
@@ -743,18 +715,10 @@ function _getMonthTransactionsByCategory(category, mesAlvo, anoAlvo) {
         }
     });
 
-    // Ordena por data crescente
     result.sort((a, b) => new Date(a.date + 'T00:00:00') - new Date(b.date + 'T00:00:00'));
     return result;
 }
 
-/**
- * Abre o dialog de lançamentos filtrados por categoria e mês.
- * Chamado pelo clique no nome da categoria nos cards de orçamento fixado.
- * @param {string} category
- * @param {number} mes  - índice 0-based
- * @param {number} ano
- */
 window.openCategoryTransactions = function(category, mes, ano) {
     const dialog   = document.getElementById('category-transactions-dialog');
     const titleEl  = document.getElementById('category-transactions-title');
@@ -767,7 +731,6 @@ window.openCategoryTransactions = function(category, mes, ano) {
     const nomeMes = dataRef.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
     const nomeMesCapitalizado = nomeMes.charAt(0).toUpperCase() + nomeMes.slice(1);
 
-    // Título do dialog
     titleEl.textContent = `${category} — ${nomeMesCapitalizado}`;
 
     if (txs.length === 0) {
@@ -903,7 +866,7 @@ form.addEventListener('submit', function(e) {
     if (typeof FirebaseModule !== 'undefined') newItemsToSync.forEach(t => FirebaseModule.syncData('transactions', t));
     updateAllViews();
     form.reset();
-    unlockRecurrenceField(); // ← Restaura o campo após salvar
+    unlockRecurrenceField(); 
     setPaymentChip('');
     document.getElementById('trans-id').value = '';
     const transDateInput = document.getElementById('trans-date');
@@ -936,7 +899,6 @@ window.editSingleProjected = function(id, date) {
     document.getElementById('trans-date').value = date;
     document.getElementById('trans-desc').value = parentTx.desc;
 
-    // ← ALTERADO: exibe o tipo real e bloqueia o campo (era hardcoded como 'unica')
     lockRecurrenceField('recorrente');
     
     setPaymentChip(parentTx.paymentMethod || '');
@@ -973,19 +935,15 @@ window.editTransaction = function(id) {
     document.getElementById('trans-desc').value = trans.desc;
     setPaymentChip(trans.paymentMethod || ''); 
 
-    // ← ALTERADO: lógica de exibição do campo "Tipo de Repetição" no modo de edição
     const isInstallment = trans.id.includes('_');
     const scopeContainer = document.getElementById('edit-scope-container');
 
     if (recurrenceSelect) {
         if (isInstallment) {
-            // Parcela de compra parcelada: exibe o tipo correto e trava
             lockRecurrenceField('parcelada');
         } else if (trans.isRecurring) {
-            // Lançamento recorrente: exibe o tipo correto e trava
             lockRecurrenceField('recorrente');
         } else {
-            // Lançamento único sem vínculo: campo funcional, mantém interativo
             unlockRecurrenceField();
             recurrenceSelect.value = 'unica';
             recurrenceSelect.dispatchEvent(new Event('change'));
@@ -1016,3 +974,61 @@ if ('serviceWorker' in navigator) {
         navigator.serviceWorker.register('./sw.js').catch(err => console.error('❌ Falha Service Worker:', err));
     });
 }
+
+// === NOVO MÓDULO DE SINCRONIZAÇÃO (Cards de Pagamento) ===
+const SyncModule = (function() {
+    const STORAGE_KEY = 'fin_sync_dates';
+    let syncDates = JSON.parse(localStorage.getItem(STORAGE_KEY)) || { debito: '', cartao1: '', cartao2: '' };
+
+    function init() {
+        updateUI();
+    }
+
+    function saveDate(method, dateVal) {
+        if(!dateVal) return;
+        syncDates[method] = dateVal;
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(syncDates));
+        updateUI();
+        
+        // Dispara a sincronização com o Firebase
+        if (typeof FirebaseModule !== 'undefined') {
+            FirebaseModule.syncData('preferences', { id: 'sync_dates', dates: syncDates });
+        }
+        
+        if (typeof showToast === 'function') {
+            showToast('Data de atualização salva!');
+        }
+    }
+
+    function updateUI() {
+        ['debito', 'cartao1', 'cartao2'].forEach(method => {
+            const displayEl = document.getElementById(`display-date-${method}`);
+            const inputEl = document.getElementById(`sync-date-${method}`);
+            const cardEl = document.getElementById(`sync-card-${method}`);
+            
+            if (displayEl && inputEl && cardEl) {
+                if (syncDates[method]) {
+                    // Converter YYYY-MM-DD para DD/MM
+                    const [y, m, d] = syncDates[method].split('-');
+                    displayEl.textContent = `Até: ${d}/${m}`;
+                    inputEl.value = syncDates[method];
+                    cardEl.title = `Atualizado até ${d}/${m}/${y}`;
+                } else {
+                    displayEl.textContent = 'Pendente';
+                    cardEl.title = 'Definir data de atualização';
+                }
+            }
+        });
+    }
+
+    // Método para ser chamado após o fetch do Firebase
+    function loadFromCloud(cloudDates) {
+        if(cloudDates) {
+            syncDates = cloudDates;
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(syncDates));
+            updateUI();
+        }
+    }
+
+    return { init, saveDate, loadFromCloud };
+})();
