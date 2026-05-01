@@ -4,16 +4,6 @@ let categories = JSON.parse(localStorage.getItem('fin_categories')) || ['Aliment
 let pinnedBudgets = JSON.parse(localStorage.getItem('fin_pinned_budgets')) || [];
 
 /**
- * FUNÇÃO UTILITÁRIA — Normaliza data para o 1º dia do mês
- * Essencial para que a lógica de exclusão no extrato funcione corretamente
- */
-function getFirstDayOfMonth(dateStr) {
-    if (!dateStr) return '';
-    const [y, m] = dateStr.split('-');
-    return `${y}-${m}-01`;
-}
-
-/**
  * FUNÇÃO UTILITÁRIA GLOBAL — Fonte Única da Verdade para Gastos Mensais
  */
 window.getMonthExpenses = function(mesAlvo, anoAlvo) {
@@ -120,6 +110,7 @@ let dashboardMonthOffset = 0;
 let _chartMonth = null; // { year, month } ou null
 
 // === TOAST DELEGATION ===
+// Mantém compatibilidade com chamadas legadas delegando para o módulo central
 window.showToast = function(message) {
     if (typeof ToastModule !== 'undefined') {
         ToastModule.show(message);
@@ -140,14 +131,23 @@ const managementView = document.getElementById('management-view');
 
 // === UTILITÁRIO: TRAVA VISUAL DO CAMPO TIPO DE REPETIÇÃO ===
 
+/**
+ * Exibe o valor correto do tipo de repetição e bloqueia o campo visualmente,
+ * pois no modo de edição ele não tem influência funcional.
+ * @param {'recorrente'|'parcelada'|'unica'} value - Valor a ser exibido
+ */
 function lockRecurrenceField(value) {
     const sel = document.getElementById('trans-recurrence-type');
     if (!sel) return;
     sel.value = value;
     sel.classList.add('select-locked');
+    // Garante que o container de parcelas não apareça desnecessariamente
     if (parcelasContainer) parcelasContainer.classList.add('hidden');
 }
 
+/**
+ * Restaura o campo ao estado interativo padrão (usado após salvar/resetar).
+ */
 function unlockRecurrenceField() {
     const sel = document.getElementById('trans-recurrence-type');
     if (!sel) return;
@@ -222,10 +222,12 @@ function init() {
     
     populateCategoryGroups();
     
+    // CategoryManager deve iniciar antes dos módulos que consomem 'categories'
     if (typeof CategoryManager !== 'undefined') CategoryManager.init();
 
     updateCategorySelect();
     
+    // --- INÍCIO: Inicialização Segura de Módulos (Try/Catch) ---
     try {
         if (typeof ExtractModule !== 'undefined') ExtractModule.init();
     } catch (error) { console.error('Erro ao iniciar ExtractModule:', error); }
@@ -235,9 +237,12 @@ function init() {
     } catch (error) { console.error('Erro ao iniciar BudgetModule:', error); }
 
     try {
+        // Inicia a funcionalidade de cards de sincronização apenas se já existir
         if (typeof SyncModule !== 'undefined') SyncModule.init();
     } catch (error) { console.error('Erro ao iniciar SyncModule:', error); }
+    // --- FIM: Inicialização Segura ---
 
+    // Picker independente do card de Despesas e Receitas por Categoria
     const chartPicker = document.getElementById('chart-month-picker');
     if (chartPicker) {
         const hoje = new Date();
@@ -811,7 +816,6 @@ form.addEventListener('submit', function(e) {
                         t.amount = amount;
                         t.type = type;
                         t.category = category;
-                        t.desc = desc; // CORREÇÃO: Propaga a descrição atualizada para as parcelas
                         t.paymentMethod = paymentMethod;
                         newItemsToSync.push(t);
                     }
@@ -845,8 +849,7 @@ form.addEventListener('submit', function(e) {
                 const editScope = document.getElementById('trans-edit-scope')?.value;
                 if (parentTx) {
                     if (editScope === 'this_and_future') {
-                        // CORREÇÃO: Usa o 1º dia do mês como data de término para exclusão correta
-                        parentTx.recurrenceEndDate = getFirstDayOfMonth(exceptionDate);
+                        parentTx.recurrenceEndDate = exceptionDate;
                         newItemsToSync.push(parentTx);
                         const transactionData = { id: Date.now().toString(), type, amount, category, date, desc, isRecurring: true, paymentMethod };
                         transactions.push(transactionData);
@@ -921,8 +924,7 @@ window.stopRecurrence = function(id, date) {
     if (confirm('Deseja interromper esta repetição a partir deste mês? Todos os lançamentos futuros serão cancelados.')) {
         const parentTx = transactions.find(t => t.id === parentId);
         if (parentTx) {
-            // CORREÇÃO: Garante granularidade mensal para exclusão no extrato
-            parentTx.recurrenceEndDate = getFirstDayOfMonth(date);
+            parentTx.recurrenceEndDate = date;
             saveData();
             if (typeof FirebaseModule !== 'undefined') FirebaseModule.syncData('transactions', parentTx);
             updateAllViews();
@@ -974,6 +976,9 @@ window.editTransaction = function(id) {
     window.scrollTo({ top: 0, behavior: 'smooth' });
 };
 
+// A chamada global init() foi removida daqui para evitar o erro TDZ (Temporal Dead Zone).
+// Ela será chamada de forma segura no final do arquivo.
+
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
         navigator.serviceWorker.register('./sw.js').catch(err => console.error('❌ Falha Service Worker:', err));
@@ -995,6 +1000,7 @@ const SyncModule = (function() {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(syncDates));
         updateUI();
         
+        // Dispara a sincronização com o Firebase
         if (typeof FirebaseModule !== 'undefined') {
             FirebaseModule.syncData('preferences', { id: 'sync_dates', dates: syncDates });
         }
@@ -1012,6 +1018,7 @@ const SyncModule = (function() {
             
             if (displayEl && inputEl && cardEl) {
                 if (syncDates[method]) {
+                    // Converter YYYY-MM-DD para DD/MM
                     const [y, m, d] = syncDates[method].split('-');
                     displayEl.textContent = `Até: ${d}/${m}`;
                     inputEl.value = syncDates[method];
@@ -1024,20 +1031,23 @@ const SyncModule = (function() {
         });
     }
 
-    function loadFromCloud(cloudDates) {
-        if(cloudDates) {
-            syncDates = cloudDates;
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(syncDates));
-            updateUI();
+  // Método para ser chamado após o fetch do Firebase
+        function loadFromCloud(cloudDates) {
+            if(cloudDates) {
+                syncDates = cloudDates;
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(syncDates));
+                updateUI();
+            }
         }
-    }
 
-    return { init, saveDate, loadFromCloud };
-})();
+        return { init, saveDate, loadFromCloud };
+    })();
 
 // =========================================================================
-// INICIALIZAÇÃO SEGURA DA APLICAÇÃO
+// INICIALIZAÇÃO SEGURA DA APLICAÇÃO (Resolução do erro SyncModule)
 // =========================================================================
+// O evento DOMContentLoaded garante que TODO o arquivo (incluindo o SyncModule)
+// já foi lido pelo navegador antes de tentarmos disparar a função init()
 document.addEventListener('DOMContentLoaded', () => {
     try {
         init();
