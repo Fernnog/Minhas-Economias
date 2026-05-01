@@ -7,6 +7,7 @@
 const ReportsModule = (function () {
 
     let _pmState = { year: null, month: null, method: 'debito' };
+    let _imprevState = { year: null, month: null }; // NOVO: Estado para Relatório 5
 
     // --- HELPERS INTERNOS ---
 
@@ -476,135 +477,147 @@ const ReportsModule = (function () {
 
         requestAnimationFrame(() => {
             const today = new Date();
-            const year = today.getFullYear();
-            const month = today.getMonth();
-            const txns = _getTxns();
-
-            // 1. Determinar subcategorias do grupo Imprevistos
-            const groups = (typeof CategoryGroups !== 'undefined') ? CategoryGroups.getGroups() : [];
-            const imprevGroup = groups.find(g => g.id === 'imprevistos');
-            const imprevSubs = imprevGroup ? imprevGroup.subcategories : [];
-
-            // 2. Calcular receita do mês
-            const totalIncome = _getMonthlyIncome(txns, year, month);
-
-            // 3. Calcular despesas de imprevistos por subcategoria
-            const subTotals = {};
-            txns.forEach(t => {
-                if (t.type !== 'despesa') return;
-                // Checar se a categoria é uma subcategoria de imprevistos
-                // ou se a própria categoria chama "Imprevistos" (compatibilidade legada)
-                const cat = t.category || '';
-                const isImprev = imprevSubs.includes(cat) ||
-                                 cat.toLowerCase() === 'imprevistos' ||
-                                 (imprevGroup && imprevSubs.length === 0 && cat.toLowerCase() === 'imprevistos');
-
-                if (!isImprev) return;
-
-                const d = new Date(t.date + 'T00:00:00');
-                const tYear = d.getFullYear(), tMonth = d.getMonth();
-                if (tYear === year && tMonth === month) {
-                    subTotals[cat] = (subTotals[cat] || 0) + t.amount;
-                    return;
-                }
-                if (t.isRecurring && (tYear < year || (tYear === year && tMonth < month))) {
-                    if (t.recurrenceEndDate && new Date(year, month, 1) >= new Date(t.recurrenceEndDate)) return;
-                    subTotals[cat] = (subTotals[cat] || 0) + t.amount;
-                }
-            });
-
-            const totalImprev = Object.values(subTotals).reduce((s, v) => s + v, 0);
-            const pct = totalIncome > 0 ? (totalImprev / totalIncome) * 100 : 0;
-            const status = _imprevStatus(pct);
-            const alert = _imprevAlertContent(status, pct, totalImprev, totalIncome);
-
-            // 4. Calcular posição do marcador na barra (escala 0 → IMPREV_MAX_PCT)
-            const markerPos = Math.min((pct / IMPREV_MAX_PCT) * 100, 97).toFixed(1);
-
-            // 5. Calcular posições dos limiares na barra
-            const warnPos  = (IMPREV_WARN_PCT   / IMPREV_MAX_PCT * 100).toFixed(1); // 20%
-            const dangerPos = (IMPREV_DANGER_PCT / IMPREV_MAX_PCT * 100).toFixed(1); // 40%
-
-            // 6. Subcategorias ordenadas
-            const sortedSubs = Object.entries(subTotals).sort(([,a], [,b]) => b - a);
-            const maxSubVal = sortedSubs.length > 0 ? sortedSubs[0][1] : 1;
-
-            const subRows = sortedSubs.length > 0
-                ? sortedSubs.map(([name, val]) => {
-                    const barPct = (val / maxSubVal * 100).toFixed(1);
-                    return `
-                        <div class="imprev-sub-row">
-                            <div class="imprev-sub-header">
-                                <span class="imprev-sub-name">${name}</span>
-                                <span class="imprev-sub-value">${_fmt(val)}</span>
-                            </div>
-                            <div class="imprev-sub-bar-track">
-                                <div class="imprev-sub-bar-fill" style="width:${barPct}%"></div>
-                            </div>
-                        </div>`;
-                }).join('')
-                : `<p class="report-empty" style="padding:1rem 0;">Nenhuma despesa de imprevistos registrada neste mês.</p>`;
-
-            const monthName = today.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
-
-            content.innerHTML = `
-                <p class="imprev-month-label">${monthName.charAt(0).toUpperCase() + monthName.slice(1)}</p>
-
-                <div class="imprev-big-display status-${status}">
-                    <span class="imprev-big-pct">${pct.toFixed(1)}<small>%</small></span>
-                    <span class="imprev-big-sub">da receita comprometida com imprevistos</span>
-                </div>
-
-                <div class="imprev-gauge-wrap">
-                    <div class="imprev-gauge-track">
-                        <div class="imprev-zone imprev-zone-ok"    style="width:${warnPos}%"></div>
-                        <div class="imprev-zone imprev-zone-warn"  style="width:${(dangerPos - warnPos).toFixed(1)}%"></div>
-                        <div class="imprev-zone imprev-zone-over"  style="flex:1"></div>
-                        <div class="imprev-marker" style="left:${markerPos}%">
-                            <div class="imprev-marker-needle"></div>
-                            <div class="imprev-marker-bubble status-bubble-${status}">${pct.toFixed(1)}%</div>
-                        </div>
-                    </div>
-                    <div class="imprev-gauge-scale">
-                        <span>0%</span>
-                        <span style="position:absolute; left:${warnPos}%; transform:translateX(-50%);">${IMPREV_WARN_PCT}%</span>
-                        <span style="position:absolute; left:${dangerPos}%; transform:translateX(-50%);">${IMPREV_DANGER_PCT}%</span>
-                        <span>${IMPREV_MAX_PCT}%+</span>
-                    </div>
-                </div>
-
-                <div class="imprev-alert-banner imprev-alert-${status}">
-                    <span class="imprev-alert-icon">${alert.icon}</span>
-                    <div class="imprev-alert-body">
-                        <strong>${alert.title}</strong>
-                        <p>${alert.msg}</p>
-                    </div>
-                </div>
-
-                <div class="imprev-totals-row">
-                    <div class="imprev-total-item">
-                        <small>Total Imprevistos</small>
-                        <strong style="color:var(--danger)">${_fmt(totalImprev)}</strong>
-                    </div>
-                    <div class="imprev-total-divider"></div>
-                    <div class="imprev-total-item">
-                        <small>Receita do Mês</small>
-                        <strong style="color:var(--success)">${_fmt(totalIncome)}</strong>
-                    </div>
-                </div>
-
-                ${sortedSubs.length > 0 ? `
-                <div class="imprev-subs-section">
-                    <h4 class="imprev-subs-title">Detalhamento por Subcategoria</h4>
-                    <div class="imprev-subs-list">${subRows}</div>
-                </div>` : ''}
-
-                ${totalIncome === 0 ? `
-                <p style="font-size:0.8rem; color:var(--text-light); text-align:center; margin-top:1rem;">
-                    ⚠ Nenhuma receita registrada neste mês — o percentual não pôde ser calculado.
-                </p>` : ''}
-            `;
+            _imprevState = { year: today.getFullYear(), month: today.getMonth() };
+            _renderReport5(_imprevState.year, _imprevState.month);
         });
+    }
+
+    function _imprevMonth(value) {
+        if (!value) return;
+        const [y, m] = value.split('-');
+        _imprevState.year = parseInt(y);
+        _imprevState.month = parseInt(m) - 1;
+        _renderReport5(_imprevState.year, _imprevState.month);
+    }
+
+    function _renderReport5(year, month) {
+        const content = document.getElementById('report5-content');
+        if (!content) return;
+
+        const txns = _getTxns();
+        const groups = (typeof CategoryGroups !== 'undefined') ? CategoryGroups.getGroups() : [];
+        const imprevGroup = groups.find(g => g.id === 'imprevistos');
+        const imprevSubs = imprevGroup ? imprevGroup.subcategories : [];
+
+        const totalIncome = _getMonthlyIncome(txns, year, month);
+
+        const subTotals = {};
+        txns.forEach(t => {
+            if (t.type !== 'despesa') return;
+            const cat = t.category || '';
+            const isImprev = imprevSubs.includes(cat) ||
+                             cat.toLowerCase() === 'imprevistos' ||
+                             (imprevGroup && imprevSubs.length === 0 && cat.toLowerCase() === 'imprevistos');
+
+            if (!isImprev) return;
+
+            const d = new Date(t.date + 'T00:00:00');
+            const tYear = d.getFullYear(), tMonth = d.getMonth();
+            if (tYear === year && tMonth === month) {
+                subTotals[cat] = (subTotals[cat] || 0) + t.amount;
+                return;
+            }
+            if (t.isRecurring && (tYear < year || (tYear === year && tMonth < month))) {
+                if (t.recurrenceEndDate && new Date(year, month, 1) >= new Date(t.recurrenceEndDate)) return;
+                subTotals[cat] = (subTotals[cat] || 0) + t.amount;
+            }
+        });
+
+        const totalImprev = Object.values(subTotals).reduce((s, v) => s + v, 0);
+        const pct = totalIncome > 0 ? (totalImprev / totalIncome) * 100 : 0;
+        const status = _imprevStatus(pct);
+        const alert = _imprevAlertContent(status, pct, totalImprev, totalIncome);
+
+        const markerPos = Math.min((pct / IMPREV_MAX_PCT) * 100, 97).toFixed(1);
+        const warnPos  = (IMPREV_WARN_PCT   / IMPREV_MAX_PCT * 100).toFixed(1);
+        const dangerPos = (IMPREV_DANGER_PCT / IMPREV_MAX_PCT * 100).toFixed(1);
+
+        const sortedSubs = Object.entries(subTotals).sort(([,a], [,b]) => b - a);
+        const maxSubVal = sortedSubs.length > 0 ? sortedSubs[0][1] : 1;
+
+        const subRows = sortedSubs.length > 0
+            ? sortedSubs.map(([name, val]) => {
+                const barPct = (val / maxSubVal * 100).toFixed(1);
+                return `
+                    <div class="imprev-sub-row">
+                        <div class="imprev-sub-header">
+                            <span class="imprev-sub-name">${name}</span>
+                            <span class="imprev-sub-value">${_fmt(val)}</span>
+                        </div>
+                        <div class="imprev-sub-bar-track">
+                            <div class="imprev-sub-bar-fill" style="width:${barPct}%"></div>
+                        </div>
+                    </div>`;
+            }).join('')
+            : `<p class="report-empty" style="padding:1rem 0;">Nenhuma despesa de imprevistos registrada neste mês.</p>`;
+
+        const dataRef = new Date(year, month, 1);
+        const monthName = dataRef.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+        const monthVal = `${year}-${String(month + 1).padStart(2, '0')}`;
+
+        content.innerHTML = `
+            <div class="imprev-header-row">
+                <p class="imprev-month-label">${monthName.charAt(0).toUpperCase() + monthName.slice(1)}</p>
+                <button class="icon-btn-small btn-dark-gold" title="Selecionar outro mês">
+                    <svg class="calendar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+                    <input type="month" value="${monthVal}" class="hidden-date-picker" onchange="ReportsModule._imprevMonth(this.value)">
+                </button>
+            </div>
+
+            <div class="imprev-big-display status-${status}">
+                <span class="imprev-big-pct">${pct.toFixed(1)}<small>%</small></span>
+                <span class="imprev-big-sub">da receita comprometida com imprevistos</span>
+            </div>
+
+            <div class="imprev-gauge-wrap">
+                <div class="imprev-gauge-track">
+                    <div class="imprev-zone imprev-zone-ok"    style="width:${warnPos}%"></div>
+                    <div class="imprev-zone imprev-zone-warn"  style="width:${(dangerPos - warnPos).toFixed(1)}%"></div>
+                    <div class="imprev-zone imprev-zone-over"  style="flex:1"></div>
+                    <div class="imprev-marker" style="left:${markerPos}%">
+                        <div class="imprev-marker-needle"></div>
+                        <div class="imprev-marker-bubble status-bubble-${status}">${pct.toFixed(1)}%</div>
+                    </div>
+                </div>
+                <div class="imprev-gauge-scale">
+                    <span>0%</span>
+                    <span style="position:absolute; left:${warnPos}%; transform:translateX(-50%);">${IMPREV_WARN_PCT}%</span>
+                    <span style="position:absolute; left:${dangerPos}%; transform:translateX(-50%);">${IMPREV_DANGER_PCT}%</span>
+                    <span>${IMPREV_MAX_PCT}%+</span>
+                </div>
+            </div>
+
+            <div class="imprev-alert-banner imprev-alert-${status}">
+                <span class="imprev-alert-icon">${alert.icon}</span>
+                <div class="imprev-alert-body">
+                    <strong>${alert.title}</strong>
+                    <p>${alert.msg}</p>
+                </div>
+            </div>
+
+            <div class="imprev-totals-row">
+                <div class="imprev-total-item">
+                    <small>Total Imprevistos</small>
+                    <strong style="color:var(--danger)">${_fmt(totalImprev)}</strong>
+                </div>
+                <div class="imprev-total-divider"></div>
+                <div class="imprev-total-item">
+                    <small>Receita do Mês</small>
+                    <strong style="color:var(--success)">${_fmt(totalIncome)}</strong>
+                </div>
+            </div>
+
+            ${sortedSubs.length > 0 ? `
+            <div class="imprev-subs-section">
+                <h4 class="imprev-subs-title">Detalhamento por Subcategoria</h4>
+                <div class="imprev-subs-list">${subRows}</div>
+            </div>` : ''}
+
+            ${totalIncome === 0 ? `
+            <p style="font-size:0.8rem; color:var(--text-light); text-align:center; margin-top:1rem;">
+                ⚠ Nenhuma receita registrada neste mês — o percentual não pôde ser calculado.
+            </p>` : ''}
+        `;
     }
 
     // API Pública
@@ -615,7 +628,8 @@ const ReportsModule = (function () {
         openPaymentMethodReport,
         openImprevistosAlert,
         _pmFilter,
-        _pmMonth
+        _pmMonth,
+        _imprevMonth // NOVO
     };
 
 })();
