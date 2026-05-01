@@ -1119,6 +1119,70 @@ dialog::backdrop { background: rgba(15, 23, 42, 0.5); backdrop-filter: blur(4px)
     transform: translateY(0);
 }
 
+/* === Toast de Marco — Termômetro de Imprevistos === */
+.toast-milestone {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 12px 18px 12px 14px;
+    border-radius: 14px;            /* Menos arredondado que o toast padrão */
+    min-width: 260px;
+    max-width: 340px;
+    pointer-events: auto;
+    text-align: left;
+}
+
+.toast-milestone-icon {
+    font-size: 1.5rem;
+    flex-shrink: 0;
+    line-height: 1;
+}
+
+.toast-milestone-body {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+
+.toast-milestone-body strong {
+    font-size: 0.85rem;
+    font-weight: 700;
+    display: block;
+}
+
+.toast-milestone-body span {
+    font-size: 0.78rem;
+    font-weight: 400;
+    opacity: 0.88;
+    display: block;
+}
+
+/* Variantes por nível de gravidade */
+.toast-milestone-info {
+    background: #2c3e50;
+    border: 1px solid var(--primary);
+    color: var(--bg);
+}
+
+.toast-milestone-warning {
+    background: #6b4400;
+    border: 1px solid var(--warning);
+    color: #fff3cd;
+}
+
+.toast-milestone-danger {
+    background: #6b1515;
+    border: 1px solid var(--danger);
+    color: #ffe5e5;
+}
+
+.toast-milestone-critical {
+    background: #3d0000;
+    border: 1px solid #ff4444;
+    color: #ffd5d5;
+    box-shadow: 0 0 18px rgba(255, 68, 68, 0.35);
+}
+
 /* ===================================================
    CENTRO DE ANÁLISE FINANCEIRA — REPORT HUB
    =================================================== */
