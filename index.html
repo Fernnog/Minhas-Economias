@@ -515,6 +515,21 @@
         <div id="report5-content" class="report-dialog-body"></div>
     </dialog>
 
+    <dialog id="impact-preview-dialog" class="report-dialog">
+        <div class="dialog-header">
+            <h3>Confirmar Alteração em Lote</h3>
+            <button class="close-dialog" onclick="document.getElementById('impact-preview-dialog').close()">&times;</button>
+        </div>
+        <div class="report-dialog-body">
+            <div id="impact-preview-content" class="impact-preview-container">
+                </div>
+            <div class="impact-preview-actions" style="margin-top: 1.5rem; display: flex; justify-content: flex-end; gap: 0.8rem;">
+                <button class="btn-ghost-sm" onclick="document.getElementById('impact-preview-dialog').close()">Cancelar</button>
+                <button id="btn-confirm-impact" class="btn-primary-sm">Confirmar e Salvar</button>
+            </div>
+        </div>
+    </dialog>
+
     <div id="toast-container" class="toast-container"></div>
 
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-app-compat.js"></script>
