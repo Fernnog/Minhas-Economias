@@ -2152,13 +2152,3 @@ button.btn-voltar.btn-dark-gold {
     .imprev-alert-banner  { padding: 0.9rem 1rem; }
     .imprev-totals-row    { padding: 0.75rem 0.9rem; }
 }
-
-.imprev-header-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 1.2rem;
-}
-.imprev-header-row .imprev-month-label {
-    margin-bottom: 0;
-}
