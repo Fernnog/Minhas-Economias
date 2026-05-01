@@ -284,64 +284,6 @@ function updateAllViews() {
     if (typeof ExtractModule !== 'undefined') ExtractModule.render();
 }
 
-// 1. ADIÇÃO: Função do verificador de alertas
-function checkImprevistosAlerts() {
-    const hoje = new Date();
-    const ano = hoje.getFullYear();
-    const mes = hoje.getMonth();
-    const monthKey = `${ano}-${mes}`;
-
-    const receitas = typeof window.getMonthIncome === 'function' ? window.getMonthIncome(mes, ano) : {};
-    const totalIncome = Object.values(receitas).reduce((a, b) => a + b, 0);
-    if (totalIncome === 0) return;
-
-    const grupos = (typeof CategoryGroups !== 'undefined') ? CategoryGroups.getGroups() : [];
-    const imprevGroup = grupos.find(g => g.id === 'imprevistos');
-    const imprevSubs = imprevGroup ? imprevGroup.subcategories : [];
-
-    let totalImprev = 0;
-    transactions.forEach(t => {
-        if (t.type !== 'despesa') return;
-        const cat = t.category || '';
-        const isImprev = imprevSubs.includes(cat) || cat.toLowerCase() === 'imprevistos' || (imprevGroup && imprevSubs.length === 0 && cat.toLowerCase() === 'imprevistos');
-        if (!isImprev) return;
-
-        const d = new Date(t.date + 'T00:00:00');
-        const tYear = d.getFullYear(), tMonth = d.getMonth();
-        if (tYear === ano && tMonth === mes) {
-            totalImprev += t.amount;
-        } else if (t.isRecurring && (tYear < ano || (tYear === ano && tMonth < mes))) {
-            if (t.recurrenceEndDate && new Date(ano, mes, 1) >= new Date(t.recurrenceEndDate)) return;
-            totalImprev += t.amount;
-        }
-    });
-
-    const pct = (totalImprev / totalIncome) * 100;
-    const marcos = [5, 10, 25, 50];
-
-    let alertasSalvos = JSON.parse(localStorage.getItem('fin_imprevistos_alerts')) || {};
-    if (alertasSalvos.monthKey !== monthKey) {
-        alertasSalvos = { monthKey, triggered: [] }; // Reseta a cada novo mês
-    }
-
-    let disparou = false;
-    for (const m of [...marcos].reverse()) {
-        if (pct >= m && !alertasSalvos.triggered.includes(m)) {
-            showToast(`🚨 Alerta: Imprevistos consumiram ${m}% da sua renda este mês!`);
-            alertasSalvos.triggered.push(m);
-            disparou = true;
-            break; // Dispara apenas o alerta de marco mais alto recém-ultrapassado
-        }
-    }
-
-    if (disparou) {
-        localStorage.setItem('fin_imprevistos_alerts', JSON.stringify(alertasSalvos));
-        if (typeof FirebaseModule !== 'undefined') {
-            FirebaseModule.syncData('preferences', { id: 'imprevistos_alerts', ...alertasSalvos });
-        }
-    }
-}
-
 function updateDashboardData() {
     const hoje = new Date();
     const anoBase = hoje.getFullYear();
@@ -423,7 +365,6 @@ function updateDashboardData() {
 
     renderCategoryIncomeExpenseChart(gastosPorCategoria, mesAtual, anoAtual);
     renderPinnedBudgets(gastosPorCategoria, mesAtual, anoAtual);
-    checkImprevistosAlerts(); // 2. CHAME a função no final de updateDashboardData()
 }
 
 function renderCategoryIncomeExpenseChart(gastos, mes, ano) {
@@ -966,21 +907,10 @@ form.addEventListener('submit', function(e) {
     saveData();
     if (typeof FirebaseModule !== 'undefined') newItemsToSync.forEach(t => FirebaseModule.syncData('transactions', t));
     updateAllViews();
-    
     form.reset();
     unlockRecurrenceField(); // ← Restaura o campo após salvar
     setPaymentChip('');
     document.getElementById('trans-id').value = '';
-    
-    // --- 3. CORREÇÃO DE PERSISTÊNCIA (Clear manual de campos invisíveis) ---
-    if(document.getElementById('trans-exception-parent')) {
-        document.getElementById('trans-exception-parent').value = ''; 
-    }
-    if(document.getElementById('trans-exception-date')) {
-        document.getElementById('trans-exception-date').value = '';   
-    }
-    // ----------------------------------------------
-    
     const transDateInput = document.getElementById('trans-date');
     if (transDateInput) transDateInput.valueAsDate = new Date();
     showToast(id ? 'Lançamento atualizado com sucesso!' : 'Novo lançamento salvo!');
