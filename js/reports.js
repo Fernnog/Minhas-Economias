@@ -35,6 +35,7 @@ const ReportsModule = (function () {
         let total = 0;
         txns.forEach(t => {
             if (t.type !== 'receita') return;
+            if (t.category === 'Sem Categoria') return; // Filtro de exatidão de saldo
             const d = new Date(t.date + 'T00:00:00');
             const tYear = d.getFullYear(), tMonth = d.getMonth();
             const isThisMonth = tYear === year && tMonth === month;
@@ -54,6 +55,7 @@ const ReportsModule = (function () {
         const expenses = {};
         txns.forEach(t => {
             if (t.type !== 'despesa') return;
+            if (t.category === 'Sem Categoria') return; // Filtro de exatidão de saldo
             const d = new Date(t.date + 'T00:00:00');
             const tYear = d.getFullYear();
             const tMonth = d.getMonth();
@@ -725,11 +727,53 @@ const ReportsModule = (function () {
         _renderReport5(_imprevState.year, _imprevState.month);
     }
 
-    function _imprevMonth(value) {
+  function _imprevMonth(value) {
         const [y, m] = value.split('-');
         _imprevState.year  = parseInt(y);
         _imprevState.month = parseInt(m) - 1;
         _renderReport5(_imprevState.year, _imprevState.month);
+    }
+
+    // ===================================================
+    // EXPORTAÇÃO PARA PDF
+    // ===================================================
+    async function exportPanelToPDF() {
+        const btn = document.getElementById('btn-export-pdf');
+        if(btn) btn.style.opacity = '0.5'; // Feedback visual UX
+        
+        const panel = document.querySelector('.chart-card');
+        if(!panel) return;
+        
+        // Preparação: Expandir subcategorias ocultas
+        const collapsedChildren = panel.querySelectorAll('.bar-row-child.hidden');
+        collapsedChildren.forEach(el => el.classList.remove('hidden'));
+        
+        // Preparação: Estilo de folha A4 e injeção do cabeçalho
+        panel.classList.add('pdf-export-mode');
+        const header = document.createElement('div');
+        header.className = 'pdf-header';
+        header.innerHTML = `
+            <img src="imagens/android-chrome-192x192.png" alt="Logo">
+            <h2>Relatório de Despesas e Receitas</h2>
+        `;
+        panel.prepend(header);
+
+        const opt = {
+            margin:       10,
+            filename:     `Relatorio_Categorias_${new Date().getTime()}.pdf`,
+            image:        { type: 'jpeg', quality: 1 },
+            html2canvas:  { scale: 2, useCORS: true },
+            jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+        };
+
+        // Geração da imagem vetorial e PDF
+        await html2pdf().set(opt).from(panel).save();
+
+        // Limpeza: Restaurar o DOM
+        header.remove();
+        panel.classList.remove('pdf-export-mode');
+        collapsedChildren.forEach(el => el.classList.add('hidden'));
+        if(btn) btn.style.opacity = '1';
     }
 
     // API Pública
@@ -739,6 +783,7 @@ const ReportsModule = (function () {
         openIncomeRigidity, 
         openPaymentMethodReport,
         openImprevistosAlert,
+        exportPanelToPDF,
         _pmFilter,
         _pmMonth,
         _imprevMonth
