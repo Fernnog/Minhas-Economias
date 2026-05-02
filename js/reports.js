@@ -735,58 +735,18 @@ const ReportsModule = (function () {
     }
 
     // ===================================================
-    // EXPORTAÇÃO PARA PDF
-    // ===================================================
-    async function exportPanelToPDF() {
-        const btn = document.getElementById('btn-export-pdf');
-        if(btn) btn.style.opacity = '0.5'; // Feedback visual UX
-        
-        const panel = document.querySelector('.chart-card');
-        if(!panel) return;
-        
-        // Preparação: Expandir subcategorias ocultas
-        const collapsedChildren = panel.querySelectorAll('.bar-row-child.hidden');
-        collapsedChildren.forEach(el => el.classList.remove('hidden'));
-        
-        // Preparação: Estilo de folha A4 e injeção do cabeçalho
-        panel.classList.add('pdf-export-mode');
-        const header = document.createElement('div');
-        header.className = 'pdf-header';
-        header.innerHTML = `
-            <img src="imagens/android-chrome-192x192.png" alt="Logo">
-            <h2>Relatório de Despesas e Receitas</h2>
-        `;
-        panel.prepend(header);
-
-        const opt = {
-            margin:       10,
-            filename:     `Relatorio_Categorias_${new Date().getTime()}.pdf`,
-            image:        { type: 'jpeg', quality: 1 },
-            html2canvas:  { scale: 2, useCORS: true },
-            jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
-        };
-
-        // Geração da imagem vetorial e PDF
-        await html2pdf().set(opt).from(panel).save();
-
-        // Limpeza: Restaurar o DOM
-        header.remove();
-        panel.classList.remove('pdf-export-mode');
-        collapsedChildren.forEach(el => el.classList.add('hidden'));
-        if(btn) btn.style.opacity = '1';
-    }
-
-    // ===================================================
     // EXPORTAÇÃO: TERMÔMETRO DE IMPREVISTOS PARA PDF
     // ===================================================
     async function exportImprevistosToPDF() {
         const element = document.getElementById('report5-content');
         if (!element) return;
         
+        // Feedback visual do botão (opcional)
         const btn = event.currentTarget;
         const oldOpacity = btn.style.opacity;
         btn.style.opacity = '0.5';
 
+        // Prepara o elemento para impressão
         element.classList.add('pdf-export-mode');
         
         const opt = {
@@ -799,6 +759,7 @@ const ReportsModule = (function () {
 
         await html2pdf().set(opt).from(element).save();
 
+        // Restaura o layout
         element.classList.remove('pdf-export-mode');
         btn.style.opacity = oldOpacity;
     }
@@ -823,6 +784,7 @@ const ReportsModule = (function () {
         const catTotals = {};
         const detailedTxns = [];
 
+        // Processa os lançamentos do mês, respeitando regras de recorrência
         txns.forEach(t => {
             const d = new Date(t.date + 'T00:00:00');
             const tYear = d.getFullYear();
@@ -861,8 +823,10 @@ const ReportsModule = (function () {
             }
         });
 
+        // Ordena do mais recente para o mais antigo
         detailedTxns.sort((a, b) => new Date(b.date) - new Date(a.date));
 
+        // Constrói o conteúdo em Markdown
         let md = `# Relatório Financeiro: ${String(month + 1).padStart(2, '0')}/${year}\n\n`;
         md += `Aja como meu consultor financeiro. Abaixo estão todos os meus dados financeiros deste mês para sua análise.\n\n`;
         md += `## 1. RESUMO GERAL\n`;
@@ -884,6 +848,7 @@ const ReportsModule = (function () {
             md += `| ${t.date} | ${t.type} | ${t.desc} | ${t.category} | R$ ${t.amount.toFixed(2)} | ${t.method} |\n`;
         });
 
+        // Gera o arquivo para download
         const blob = new Blob([md], { type: 'text/markdown;charset=utf-8' });
         const link = document.createElement('a');
         link.href = URL.createObjectURL(blob);
@@ -893,6 +858,48 @@ const ReportsModule = (function () {
         document.body.removeChild(link);
         
         document.getElementById('export-ai-dialog').close();
+    }
+
+    // ===================================================
+    // EXPORTAÇÃO PARA PDF (Dashboard original)
+    // ===================================================
+    async function exportPanelToPDF() {
+        const btn = document.getElementById('btn-export-pdf');
+        if(btn) btn.style.opacity = '0.5'; // Feedback visual UX
+        
+        const panel = document.querySelector('.chart-card');
+        if(!panel) return;
+        
+        // Preparação: Expandir subcategorias ocultas
+        const collapsedChildren = panel.querySelectorAll('.bar-row-child.hidden');
+        collapsedChildren.forEach(el => el.classList.remove('hidden'));
+        
+        // Preparação: Estilo de folha A4 e injeção do cabeçalho
+        panel.classList.add('pdf-export-mode');
+        const header = document.createElement('div');
+        header.className = 'pdf-header';
+        header.innerHTML = `
+            <img src="imagens/android-chrome-192x192.png" alt="Logo">
+            <h2>Relatório de Despesas e Receitas</h2>
+        `;
+        panel.prepend(header);
+
+        const opt = {
+            margin:       10,
+            filename:     `Relatorio_Categorias_${new Date().getTime()}.pdf`,
+            image:        { type: 'jpeg', quality: 1 },
+            html2canvas:  { scale: 2, useCORS: true },
+            jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+        };
+
+        // Geração da imagem vetorial e PDF
+        await html2pdf().set(opt).from(panel).save();
+
+        // Limpeza: Restaurar o DOM
+        header.remove();
+        panel.classList.remove('pdf-export-mode');
+        collapsedChildren.forEach(el => el.classList.add('hidden'));
+        if(btn) btn.style.opacity = '1';
     }
 
     // API Pública
