@@ -445,6 +445,18 @@
                                 <span class="report-card-cta">Ver Relatório →</span>
                             </button>
 
+                            <button class="report-launcher-card report-launcher-ai" onclick="document.getElementById('export-ai-dialog').showModal()">
+                                <div class="report-card-icon">
+                                    <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                                        <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+                                        <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path>
+                                    </svg>
+                                </div>
+                                <h4 class="report-card-title">Extrator para Consultoria IA</h4>
+                                <p class="report-card-desc">Gere um arquivo de texto completo do mês para alimentar modelos de Inteligência Artificial externos.</p>
+                                <span class="report-card-cta">Extrair Dados →</span>
+                            </button>
+
                         </div>
                     </div>
                 </section>
@@ -518,11 +530,38 @@
                     <input type="month" id="report5-month-input" class="hidden-date-picker"
                            onchange="ReportsModule._imprevMonth(this.value)">
                 </button>
+                <button class="icon-btn-small" title="Gerar Relatório PDF" onclick="ReportsModule.exportImprevistosToPDF()">
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="6 9 6 2 18 2 18 9"></polyline>
+                        <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
+                        <rect x="6" y="14" width="12" height="8"></rect>
+                    </svg>
+                </button>
                 <button class="close-dialog"
                         onclick="document.getElementById('report5-dialog').close()">&times;</button>
             </div>
         </div>
         <div id="report5-content" class="report-dialog-body"></div>
+    </dialog>
+
+    <dialog id="export-ai-dialog" class="report-dialog" style="max-width: 400px;">
+        <div class="dialog-header">
+            <h3>Exportar para IA</h3>
+            <button class="close-dialog" onclick="document.getElementById('export-ai-dialog').close()">&times;</button>
+        </div>
+        <div class="report-dialog-body" style="text-align: center; padding: 2rem 1.5rem;">
+            <p style="margin-bottom: 1.5rem; font-size: 0.9rem; color: var(--text-light);">Selecione o mês para compilar todos os dados em formato texto (Markdown).</p>
+            <div style="display: flex; justify-content: center; gap: 1rem; align-items: center;">
+                <input type="month" id="ai-export-month-input" class="form-select-sm" style="padding: 0.6rem; border-radius: 8px; border: 1px solid var(--border);" required>
+                <button class="icon-btn-small btn-dark-gold" title="Baixar Arquivo TXT" onclick="ReportsModule.exportAITxtReport()">
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                        <polyline points="7 10 12 15 17 10"></polyline>
+                        <line x1="12" y1="15" x2="12" y2="3"></line>
+                    </svg>
+                </button>
+            </div>
+        </div>
     </dialog>
 
     <div id="toast-container" class="toast-container"></div>

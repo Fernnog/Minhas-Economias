@@ -2000,6 +2000,18 @@ button.btn-voltar.btn-dark-gold {
     color: #F97316;
 }
 
+/* Card de Exportação para IA */
+.report-launcher-ai {
+    border-color: rgba(139, 92, 246, 0.4);
+}
+.report-launcher-ai:hover {
+    border-color: rgba(139, 92, 246, 0.75);
+    box-shadow: 0 8px 24px rgba(139, 92, 246, 0.18);
+}
+.report-launcher-ai .report-card-icon {
+    color: #8B5CF6; 
+}
+
 /* Label do mês */
 .imprev-month-label {
     font-size: 0.78rem;
