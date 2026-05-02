@@ -345,6 +345,46 @@ main { padding: 2rem; flex: 1; max-width: 1200px; margin: 0 auto; width: 100%; }
     font-size: 1.1rem;
 }
 
+/* Agrupamento de ícones no topo do painel */
+.action-group-right {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+/* Regras aplicadas dinamicamente via JS apenas durante a geração do PDF */
+.pdf-export-mode {
+    padding: 30px !important;
+    background: var(--bg) !important;
+}
+
+/* Oculta botões que não devem aparecer na impressão */
+.pdf-export-mode .action-group-right {
+    display: none !important;
+}
+
+/* Estilo do cabeçalho injetado para o PDF */
+.pdf-header {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    margin-bottom: 25px;
+    border-bottom: 2px solid var(--primary);
+    padding-bottom: 15px;
+}
+
+.pdf-header img {
+    width: 50px;
+    height: 50px;
+    border-radius: 8px;
+}
+
+.pdf-header h2 {
+    color: var(--primary);
+    font-family: 'Playfair Display', serif;
+    margin: 0;
+}
+
 .chart-month-chip {
     display: inline-block;
     background: var(--premium-gradient, linear-gradient(135deg, #2a2318 0%, #3d3325 100%));
