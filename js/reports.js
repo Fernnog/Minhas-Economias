@@ -776,6 +776,125 @@ const ReportsModule = (function () {
         if(btn) btn.style.opacity = '1';
     }
 
+    // ===================================================
+    // EXPORTAÇÃO: TERMÔMETRO DE IMPREVISTOS PARA PDF
+    // ===================================================
+    async function exportImprevistosToPDF() {
+        const element = document.getElementById('report5-content');
+        if (!element) return;
+        
+        const btn = event.currentTarget;
+        const oldOpacity = btn.style.opacity;
+        btn.style.opacity = '0.5';
+
+        element.classList.add('pdf-export-mode');
+        
+        const opt = {
+            margin:       15,
+            filename:     `Imprevistos_${_imprevState.year}_${String(_imprevState.month + 1).padStart(2, '0')}.pdf`,
+            image:        { type: 'jpeg', quality: 1 },
+            html2canvas:  { scale: 2, useCORS: true },
+            jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+        };
+
+        await html2pdf().set(opt).from(element).save();
+
+        element.classList.remove('pdf-export-mode');
+        btn.style.opacity = oldOpacity;
+    }
+
+    // ===================================================
+    // EXPORTAÇÃO: DADOS PARA INTELIGÊNCIA ARTIFICIAL (TXT/MD)
+    // ===================================================
+    function exportAITxtReport() {
+        const monthInput = document.getElementById('ai-export-month-input').value;
+        if (!monthInput) {
+            if(typeof showToast === 'function') showToast('Selecione um mês primeiro.');
+            return;
+        }
+        
+        const [y, m] = monthInput.split('-');
+        const year = parseInt(y);
+        const month = parseInt(m) - 1;
+        const txns = _getTxns();
+        
+        let totalIncome = 0;
+        let totalExpense = 0;
+        const catTotals = {};
+        const detailedTxns = [];
+
+        txns.forEach(t => {
+            const d = new Date(t.date + 'T00:00:00');
+            const tYear = d.getFullYear();
+            const tMonth = d.getMonth();
+            
+            let isActiveThisMonth = false;
+            let activeDate = t.date;
+
+            if (tYear === year && tMonth === month) {
+                isActiveThisMonth = true;
+            } else if (t.isRecurring && (tYear < year || (tYear === year && tMonth < month))) {
+                const mesStr = `${year}-${String(month + 1).padStart(2, '0')}`;
+                const fim = t.recurrenceEndDate ? new Date(t.recurrenceEndDate) : null;
+                const isSkipped = t.skippedDates && t.skippedDates.some(sd => sd.startsWith(mesStr));
+                
+                if (!isSkipped && (!fim || new Date(year, month, 1) < fim)) {
+                    isActiveThisMonth = true;
+                    activeDate = `${mesStr}-${String(d.getDate()).padStart(2, '0')}`;
+                }
+            }
+
+            if (isActiveThisMonth) {
+                if (t.type === 'receita') totalIncome += t.amount;
+                if (t.type === 'despesa') {
+                    totalExpense += t.amount;
+                    catTotals[t.category] = (catTotals[t.category] || 0) + t.amount;
+                }
+                detailedTxns.push({
+                    date: activeDate,
+                    type: t.type,
+                    desc: t.desc || 'Sem descrição',
+                    category: t.category,
+                    amount: t.amount,
+                    method: t.paymentMethod || 'Sem método'
+                });
+            }
+        });
+
+        detailedTxns.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+        let md = `# Relatório Financeiro: ${String(month + 1).padStart(2, '0')}/${year}\n\n`;
+        md += `Aja como meu consultor financeiro. Abaixo estão todos os meus dados financeiros deste mês para sua análise.\n\n`;
+        md += `## 1. RESUMO GERAL\n`;
+        md += `- Receitas Totais: R$ ${totalIncome.toFixed(2)}\n`;
+        md += `- Despesas Totais: R$ ${totalExpense.toFixed(2)}\n`;
+        md += `- Saldo Líquido: R$ ${(totalIncome - totalExpense).toFixed(2)}\n\n`;
+        
+        md += `## 2. GASTOS POR CATEGORIA\n`;
+        Object.entries(catTotals)
+            .sort((a, b) => b[1] - a[1])
+            .forEach(([cat, val]) => {
+                md += `- ${cat}: R$ ${val.toFixed(2)}\n`;
+            });
+        
+        md += `\n## 3. LANÇAMENTOS DETALHADOS\n`;
+        md += `| Data | Tipo | Descrição | Categoria | Valor | Pagamento |\n`;
+        md += `|---|---|---|---|---|---|\n`;
+        detailedTxns.forEach(t => {
+            md += `| ${t.date} | ${t.type} | ${t.desc} | ${t.category} | R$ ${t.amount.toFixed(2)} | ${t.method} |\n`;
+        });
+
+        const blob = new Blob([md], { type: 'text/markdown;charset=utf-8' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = `Dados_IA_${year}_${String(month + 1).padStart(2, '0')}.md`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        document.getElementById('export-ai-dialog').close();
+    }
+
     // API Pública
     return { 
         openBudgetDeviation, 
@@ -784,6 +903,8 @@ const ReportsModule = (function () {
         openPaymentMethodReport,
         openImprevistosAlert,
         exportPanelToPDF,
+        exportImprevistosToPDF,
+        exportAITxtReport,
         _pmFilter,
         _pmMonth,
         _imprevMonth
