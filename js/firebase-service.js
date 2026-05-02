@@ -216,6 +216,18 @@ const FirebaseModule = (function() {
                 if (typeof SyncModule !== 'undefined') SyncModule.loadFromCloud(data.dates);
             }
 
+            // F) Sincronizar Status de Conferência do Extrato
+            const confRef = await db.collection('users').doc(uid).collection('preferences').doc('confirmed_items').get();
+            if (confRef.exists) {
+                const data = confRef.data();
+                if (typeof ExtractModule !== 'undefined' && ExtractModule.loadConfirmedFromCloud) {
+                    ExtractModule.loadConfirmedFromCloud(data.items || {});
+                } else {
+                    // Fallback de segurança caso o módulo ainda não esteja pronto na ordem de carregamento
+                    localStorage.setItem('fin_confirmed_items', JSON.stringify(data.items || {}));
+                }
+            }
+
             // E) Atualizar a Interface
             if (typeof updateCategorySelect === 'function') updateCategorySelect();
             if (typeof BudgetModule !== 'undefined') BudgetModule.updateCategoryOptions();

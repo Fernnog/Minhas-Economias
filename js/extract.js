@@ -25,6 +25,12 @@ const ExtractModule = (function() {
             confirmedItems[key] = true;
         }
         _saveConfirmed();
+
+        // NOVO: Espelha o dicionário atualizado na nuvem
+        if (typeof FirebaseModule !== 'undefined') {
+            FirebaseModule.syncData('preferences', { id: 'confirmed_items', items: confirmedItems });
+        }
+
         render();
     };
 
@@ -182,5 +188,13 @@ const ExtractModule = (function() {
         });
     }
 
-    return { init, render };
+    function loadConfirmedFromCloud(cloudData) {
+        if (cloudData) {
+            confirmedItems = cloudData;
+            _saveConfirmed(); // Garante que o localStorage local também fique atualizado
+            render();
+        }
+    }
+
+    return { init, render, loadConfirmedFromCloud };
 })();
