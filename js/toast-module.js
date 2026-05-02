@@ -15,6 +15,11 @@ const ToastModule = (function () {
         
         const toast = document.createElement('div');
         toast.className = `toast ${type !== 'default' ? 'toast-' + type : ''}`;
+        
+        // ✨ Melhorias de Acessibilidade (A11y) adicionadas:
+        toast.setAttribute('role', 'alert');
+        toast.setAttribute('aria-live', 'assertive');
+        
         toast.innerText = message;
         
         _renderAndAnimate(toast, container, 3000);
@@ -51,10 +56,21 @@ const ToastModule = (function () {
         void element.offsetWidth; 
         element.classList.add('show');
         
-        setTimeout(() => {
+        // Controle de estado para evitar erros na remoção
+        let isRemoving = false;
+        
+        const removeToast = () => {
+            if (isRemoving) return;
+            isRemoving = true;
             element.classList.remove('show');
             setTimeout(() => element.remove(), 300);
-        }, duration);
+        };
+
+        // UX: Click-to-dismiss (Clique para fechar instantaneamente)
+        element.addEventListener('click', removeToast);
+        
+        // Remoção automática após a duração
+        setTimeout(removeToast, duration);
     }
 
     // API Pública
