@@ -53,6 +53,62 @@ const ExtractModule = (function() {
         render();
     };
 
+    // --- NOVA LÓGICA DE ROLAGEM ---
+    function _setupScrollButtons() {
+        const btnTop = document.getElementById('btn-scroll-top');
+        const btnBottom = document.getElementById('btn-scroll-bottom');
+        const container = document.getElementById('extract-scroll-controls');
+        
+        if (!btnTop || !btnBottom || !container) return;
+
+        // Ações de clique (Rolagem Suave)
+        btnTop.addEventListener('click', () => window.scrollTo({ top: 0, behavior: 'smooth' }));
+        btnBottom.addEventListener('click', () => window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'smooth' }));
+
+        let isScrolling = false;
+
+        // Ouve o scroll do navegador com otimização (requestAnimationFrame)
+        window.addEventListener('scroll', () => {
+            const extractView = document.getElementById('view-extract');
+            // Só executa se estivermos na tela de Extrato
+            if (!extractView || extractView.classList.contains('hidden')) {
+                if (!container.classList.contains('hidden')) container.classList.add('hidden');
+                return;
+            }
+
+            container.classList.remove('hidden');
+
+            if (!isScrolling) {
+                window.requestAnimationFrame(() => {
+                    const scrollY = window.scrollY;
+                    const windowHeight = window.innerHeight;
+                    const documentHeight = document.documentElement.scrollHeight;
+                    
+                    // Margens de tolerância (100px)
+                    const thresholdTop = 100;
+                    const thresholdBottom = 100;
+
+                    // Controle do Botão TOPO (Soma se estiver perto do topo)
+                    if (scrollY <= thresholdTop) {
+                        btnTop.classList.add('hidden');
+                    } else {
+                        btnTop.classList.remove('hidden');
+                    }
+
+                    // Controle do Botão RODAPÉ (Soma se estiver no fim da página)
+                    if (scrollY + windowHeight >= documentHeight - thresholdBottom) {
+                        btnBottom.classList.add('hidden');
+                    } else {
+                        btnBottom.classList.remove('hidden');
+                    }
+
+                    isScrolling = false;
+                });
+                isScrolling = true;
+            }
+        });
+    }
+
     function init() {
         const picker = document.getElementById('extract-month-picker');
         if (picker) {
@@ -64,6 +120,9 @@ const ExtractModule = (function() {
                 render();
             });
         }
+
+        // Inicializa os botões flutuantes de rolagem
+        _setupScrollButtons();
     }
 
     /**
@@ -186,6 +245,9 @@ const ExtractModule = (function() {
                     <td colspan="3">Saldo do dia: <span class="${group.dayBalance < 0 ? 'despesa' : ''}">${group.dayBalance.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span></td>
                 </tr>`;
         });
+
+        // NOVO: Força um evento de scroll falso para recalcular botões após remontar a lista
+        setTimeout(() => window.dispatchEvent(new Event('scroll')), 100);
     }
 
     function loadConfirmedFromCloud(cloudData) {
