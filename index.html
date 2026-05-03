@@ -233,6 +233,24 @@
                 </aside>
 
                 <section id="view-extract" class="hidden">
+                    <!-- NOVO: Controles de Rolagem Flutuantes -->
+                    <div id="extract-scroll-controls" class="floating-scroll-controls hidden">
+                        <button id="btn-scroll-top" class="floating-scroll-btn hidden" title="Ir para o topo">
+                            <!-- Ícone de Casa (Início) -->
+                            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+                                <polyline points="9 22 9 12 15 12 15 22"></polyline>
+                            </svg>
+                        </button>
+                        <button id="btn-scroll-bottom" class="floating-scroll-btn hidden" title="Ir para o final">
+                            <!-- Ícone de Seta para Baixo (Fim) -->
+                            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <line x1="12" y1="5" x2="12" y2="19"></line>
+                                <polyline points="19 12 12 19 5 12"></polyline>
+                            </svg>
+                        </button>
+                    </div>
+
                     <div class="card">
                         <div class="month-selector-header">
                             <h3 id="extract-month-title">Extrato de Lançamentos</h3>

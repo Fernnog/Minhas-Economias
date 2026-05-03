@@ -2345,3 +2345,65 @@ button.btn-voltar.btn-dark-gold {
     .sync-title { font-size: 0.8rem; }
     .sync-date-display { font-size: 0.7rem; }
 }
+
+/* =============================================
+   BOTÕES FLUTUANTES DE ROLAGEM (EXTRATO)
+   ============================================= */
+.floating-scroll-controls {
+    position: fixed;
+    bottom: 30px;
+    right: 30px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    z-index: 9000; /* Abaixo do toast (9999) mas acima do resto */
+    pointer-events: none; /* Permite clicar através do container invisível */
+}
+
+.floating-scroll-btn {
+    background-color: var(--card);
+    color: var(--primary);
+    border: 1px solid var(--border);
+    border-radius: 50%;
+    width: 46px;
+    height: 46px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+    transition: opacity 0.3s ease, transform 0.3s ease, background-color 0.2s, box-shadow 0.2s;
+    pointer-events: auto; /* Reativa o clique apenas nos botões */
+    opacity: 1;
+    transform: translateY(0) scale(1);
+}
+
+.floating-scroll-btn:hover {
+    background-color: var(--primary);
+    color: #fff;
+    transform: translateY(-2px) scale(1.05);
+    box-shadow: 0 6px 16px rgba(201, 168, 76, 0.25);
+}
+
+.floating-scroll-btn:active {
+    transform: translateY(0) scale(0.95);
+}
+
+/* Estado Oculto (quando no topo ou rodapé) */
+.floating-scroll-btn.hidden {
+    opacity: 0;
+    transform: translateY(15px) scale(0.9);
+    pointer-events: none;
+}
+
+/* Responsividade para telas menores */
+@media (max-width: 600px) {
+    .floating-scroll-controls {
+        bottom: 20px;
+        right: 20px;
+    }
+    .floating-scroll-btn {
+        width: 40px;
+        height: 40px;
+    }
+}
