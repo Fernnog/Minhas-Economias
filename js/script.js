@@ -265,6 +265,18 @@ window.showDashboard = function() {
     updateAllViews();
 };
 
+/**
+ * Navegação Rápida: Altera o DOM apenas visualmente sem recalcular os dados.
+ * Quebra o acoplamento pesado da função tradicional showDashboard().
+ */
+function fastNavigateToDashboard() {
+    const mgmtView = document.getElementById('management-view');
+    const dashView = document.getElementById('dashboard-view');
+    if (mgmtView) mgmtView.classList.add('hidden');
+    if (dashView) dashView.classList.remove('hidden');
+    window.scrollTo({ top: 0, behavior: 'instant' });
+}
+
 window.showView = function(targetView) {
     dashboardView.classList.add('hidden');
     managementView.classList.remove('hidden');
@@ -871,17 +883,49 @@ form.addEventListener('submit', function(e) {
         }
     }
 
-    saveData();
-    if (typeof FirebaseModule !== 'undefined') newItemsToSync.forEach(t => FirebaseModule.syncData('transactions', t));
-    updateAllViews();
+    // --- NOVA ARQUITETURA DE SALVAMENTO E UI NON-BLOCKING ---
+
+    // FASE 1: INTEGRIDADE DE DADOS (Execução Imediata Síncrona)
+    saveData(); 
+    
+    // FASE 2: RESET VISUAL DO FORMULÁRIO (Operações Dom Leves)
     form.reset();
     unlockRecurrenceField(); 
     setPaymentChip('');
     document.getElementById('trans-id').value = '';
+    document.getElementById('btn-save').innerText = 'Salvar Lançamento';
     const transDateInput = document.getElementById('trans-date');
     if (transDateInput) transDateInput.valueAsDate = new Date();
+
+    // FASE 3: FEEDBACK E NAVEGAÇÃO RÁPIDA (UX Instântanea)
     showToast(id ? 'Lançamento atualizado com sucesso!' : 'Novo lançamento salvo!');
-    showDashboard();
+    fastNavigateToDashboard(); // Usa a navegação isolada para evitar duplo recálculo
+
+    // Aciona o Indicador Visual de Segundo Plano
+    const syncIndicator = document.getElementById('background-sync-indicator');
+    if (syncIndicator) {
+        syncIndicator.classList.add('active');
+    }
+
+    // FASE 4: PROCESSAMENTO PESADO EM SEGUNDO PLANO
+    // O setTimeout(..., 60) devolve a thread para a GPU pintar a tela de Dashboard e o Toast.
+    // Assim, o celular mostra a transição de tela SEM ENGASGOS antes de fazer a matemática.
+    setTimeout(() => {
+        
+        // 4.1 Sync com Nuvem (Assíncrono via API, não bloqueia UI)
+        if (typeof FirebaseModule !== 'undefined') {
+            newItemsToSync.forEach(t => FirebaseModule.syncData('transactions', t));
+        }
+
+        // 4.2 O "Trabalho Pesado": Recálculos e montagem de gráficos
+        updateAllViews();
+        
+        // 4.3 Finalização
+        if (syncIndicator) {
+            syncIndicator.classList.remove('active');
+        }
+    }, 60);
+
 });
 
 window.deleteTransaction = function(id) {
