@@ -2407,3 +2407,38 @@ button.btn-voltar.btn-dark-gold {
         height: 40px;
     }
 }
+
+/* === INDICADOR DE SINCRONIZAÇÃO EM SEGUNDO PLANO === */
+#background-sync-indicator {
+    position: fixed;
+    top: 80px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--premium-gradient);
+    color: var(--primary);
+    padding: 6px 16px;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    z-index: 1000;
+    border: 1px solid var(--premium-border);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+}
+
+#background-sync-indicator.active {
+    opacity: 1;
+}
+
+.spin-icon {
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    100% { transform: rotate(360deg); }
+}
