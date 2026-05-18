@@ -1,0 +1,754 @@
+/* ===================================================
+   ARQUIVO: reports.css
+   Módulo: Centro de Análise Financeira & Toasts Avançados
+   =================================================== */
+
+/* === Toast de Marco — Termômetro de Imprevistos === */
+.toast-milestone {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 12px 18px 12px 14px;
+    border-radius: 14px;            /* Menos arredondado que o toast padrão */
+    min-width: 260px;
+    max-width: 340px;
+    pointer-events: auto;
+    text-align: left;
+}
+
+.toast-milestone-icon {
+    font-size: 1.5rem;
+    flex-shrink: 0;
+    line-height: 1;
+}
+
+.toast-milestone-body {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+
+.toast-milestone-body strong {
+    font-size: 0.85rem;
+    font-weight: 700;
+    display: block;
+}
+
+.toast-milestone-body span {
+    font-size: 0.78rem;
+    font-weight: 400;
+    opacity: 0.88;
+    display: block;
+}
+
+/* Variantes por nível de gravidade */
+.toast-milestone-info {
+    background: #2c3e50;
+    border: 1px solid var(--primary);
+    color: var(--bg);
+}
+
+.toast-milestone-warning {
+    background: #6b4400;
+    border: 1px solid var(--warning);
+    color: #fff3cd;
+}
+
+.toast-milestone-danger {
+    background: #6b1515;
+    border: 1px solid var(--danger);
+    color: #ffe5e5;
+}
+
+.toast-milestone-critical {
+    background: #3d0000;
+    border: 1px solid #ff4444;
+    color: #ffd5d5;
+    box-shadow: 0 0 18px rgba(255, 68, 68, 0.35);
+}
+
+/* ===================================================
+   CENTRO DE ANÁLISE FINANCEIRA — REPORT HUB
+   =================================================== */
+
+.report-cards-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 1rem;
+}
+
+/* Cartão Lançador — Design Escuro & Sofisticado */
+.report-launcher-card {
+    background: var(--premium-gradient);
+    border: 1px solid var(--premium-border);
+    border-radius: 14px;
+    padding: 1.6rem 1.4rem;
+    text-align: left;
+    cursor: pointer;
+    transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+}
+
+.report-launcher-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+    border-color: rgba(201, 168, 76, 0.6);
+}
+
+.report-launcher-card:active {
+    transform: scale(0.98);
+}
+
+.report-card-icon {
+    color: var(--primary);
+    margin-bottom: 0.4rem;
+}
+
+.report-card-title {
+    font-size: 1rem;
+    font-weight: 700;
+    color: #FAF7F2;
+    border: none;
+    padding: 0;
+    margin: 0;
+}
+
+.report-card-desc {
+    font-size: 0.83rem;
+    color: rgba(250, 247, 242, 0.6);
+    line-height: 1.5;
+    flex: 1;
+}
+
+.report-card-cta {
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: var(--primary);
+    letter-spacing: 0.3px;
+    margin-top: 0.4rem;
+}
+
+/* ===================================================
+   REPORT DIALOGS — MODAL INTERNO
+   =================================================== */
+
+.report-dialog {
+    max-width: 560px;
+    width: 94%;
+}
+
+.report-dialog-body {
+    padding: 1.5rem;
+    max-height: 70vh;
+    overflow-y: auto;
+}
+
+/* --- Relatório: Comum a todos --- */
+.report-table {
+    display: flex;
+    flex-direction: column;
+    gap: 0.8rem;
+}
+
+.report-row {
+    display: grid;
+    grid-template-columns: 1fr auto auto;
+    align-items: center;
+    gap: 0.8rem;
+    padding: 0.9rem 1rem;
+    background: var(--surface);
+    border-radius: 8px;
+    border: 1px solid var(--border);
+}
+
+.report-row-name {
+    font-weight: 600;
+    font-size: 0.9rem;
+    color: var(--text);
+}
+
+.report-row-values {
+    font-size: 0.82rem;
+    color: var(--text-light);
+    display: flex;
+    gap: 0.3rem;
+    align-items: center;
+    white-space: nowrap;
+}
+
+.separator { color: var(--border); }
+
+.report-pill {
+    font-size: 0.82rem;
+    font-weight: 700;
+    padding: 0.3rem 0.7rem;
+    border-radius: 20px;
+    white-space: nowrap;
+}
+
+.pill-success {
+    background: rgba(76, 175, 124, 0.12);
+    color: var(--success);
+}
+
+.pill-danger {
+    background: rgba(224, 82, 82, 0.12);
+    color: var(--danger);
+}
+
+.pill-neutral {
+    background: var(--bg);
+    color: var(--text-light);
+}
+
+.report-empty {
+    text-align: center;
+    color: var(--text-light);
+    padding: 2rem;
+    font-size: 0.9rem;
+}
+
+/* =============================================
+   RELATÓRIO 4 — GASTOS POR PAGAMENTO
+   ============================================= */
+.payment-filter-bar {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1.5rem;
+    flex-wrap: wrap;
+}
+
+.payment-filter-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.45rem 1rem;
+    border-radius: 20px;
+    border: 1.5px solid var(--border);
+    font-size: 0.82rem;
+    font-weight: 600;
+    cursor: pointer;
+    background: var(--surface);
+    color: var(--text-light);
+    transition: all 0.18s ease;
+}
+
+.payment-filter-btn.active-debito  { background:rgba(37,99,235,0.1);  color:#2563EB; border-color:#2563EB; }
+.payment-filter-btn.active-cartao1 { background:rgba(5,150,105,0.1);  color:#059669; border-color:#059669; }
+.payment-filter-btn.active-cartao2 { background:rgba(124,58,237,0.1); color:#7C3AED; border-color:#7C3AED; }
+
+.report4-month-selector {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    margin-bottom: 1.2rem;
+    font-size: 0.85rem;
+    color: var(--text-light);
+}
+
+.report4-month-selector input[type="month"] {
+    padding: 0.3rem 0.6rem;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 0.85rem;
+    background: var(--card);
+    color: var(--text);
+    cursor: pointer;
+}
+
+.report4-total-banner {
+    margin-top: 1.5rem;
+    padding: 0.9rem 1.2rem;
+    border-radius: 10px;
+    text-align: center;
+    font-weight: 700;
+    font-size: 1rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+}
+
+/* --- Relatório 2: Radar de Comprometimento --- */
+.commitment-chart {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.commitment-month-row {
+    display: grid;
+    grid-template-columns: 52px 1fr 90px;
+    align-items: center;
+    gap: 0.8rem;
+}
+
+.commitment-month-label {
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: var(--text-light);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.commitment-bar-track {
+    height: 22px;
+    background: var(--bg);
+    border-radius: 5px;
+    overflow: hidden;
+    display: flex;
+    border: 1px solid var(--border);
+}
+
+.commitment-segment-fixed {
+    height: 100%;
+    background: #3d3830;
+    transition: width 0.6s ease;
+}
+
+.commitment-segment-variable {
+    height: 100%;
+    background: var(--danger);
+    opacity: 0.85;
+    transition: width 0.6s ease;
+}
+
+.commitment-total-label {
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--text);
+    text-align: right;
+    white-space: nowrap;
+}
+
+.commitment-current-month .commitment-bar-track {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 1px var(--primary);
+}
+
+.commitment-current-month .commitment-month-label {
+    color: var(--primary);
+}
+
+.chart-legend {
+    display: flex;
+    gap: 1.2rem;
+    margin-top: 1.2rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--border);
+    flex-wrap: wrap;
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.82rem;
+    color: var(--text-light);
+    font-weight: 500;
+}
+
+.legend-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 3px;
+    flex-shrink: 0;
+}
+
+/* --- Relatório 3: Engessamento da Renda --- */
+.rigidity-section {
+    display: flex;
+    gap: 2rem;
+    align-items: center;
+    flex-wrap: wrap;
+    margin-bottom: 1.5rem;
+}
+
+.doughnut-wrap {
+    flex-shrink: 0;
+}
+
+.doughnut-ring {
+    width: 140px;
+    height: 140px;
+    border-radius: 50%;
+    -webkit-mask: radial-gradient(circle, transparent 42%, black 42%);
+    mask: radial-gradient(circle, transparent 42%, black 42%);
+}
+
+.doughnut-stats {
+    display: flex;
+    flex-direction: column;
+    gap: 0.9rem;
+    flex: 1;
+}
+
+.doughnut-stat-item {
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+}
+
+.doughnut-stat-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.doughnut-stat-info small {
+    display: block;
+    font-size: 0.75rem;
+    color: var(--text-light);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-weight: 600;
+}
+
+.doughnut-stat-info strong {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--text);
+    font-family: 'Playfair Display', serif;
+}
+
+.rigidity-index-banner {
+    padding: 1.2rem 1.4rem;
+    border-radius: 10px;
+    border-left: 4px solid var(--primary);
+}
+
+.rigidity-index-banner.status-ok {
+    background: rgba(76,175,124,0.08);
+    border-left-color: var(--success);
+}
+.rigidity-index-banner.status-warning {
+    background: rgba(212,164,80,0.1);
+    border-left-color: var(--warning);
+}
+.rigidity-index-banner.status-danger {
+    background: rgba(224,82,82,0.08);
+    border-left-color: var(--danger);
+}
+
+.rigidity-index-label {
+    display: block;
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: var(--text-light);
+    margin-bottom: 0.4rem;
+}
+
+.rigidity-index-value {
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: var(--text);
+    line-height: 1.4;
+}
+
+/* Responsivo mobile */
+@media (max-width: 600px) {
+    .report-cards-grid {
+        grid-template-columns: 1fr;
+    }
+    .report-row {
+        grid-template-columns: 1fr auto;
+        grid-template-rows: auto auto;
+    }
+    .report-row-values {
+        grid-column: 1 / -1;
+        font-size: 0.78rem;
+    }
+    .rigidity-section {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+}
+
+/* ===================================================
+   RELATÓRIO 5 — TERMÔMETRO DE IMPREVISTOS E LANÇADORES
+   =================================================== */
+
+/* Cartão lançador com destaque âmbar/laranja */
+.report-launcher-imprevistos {
+    border-color: rgba(249, 115, 22, 0.4);
+}
+.report-launcher-imprevistos:hover {
+    border-color: rgba(249, 115, 22, 0.75);
+    box-shadow: 0 8px 24px rgba(249, 115, 22, 0.18);
+}
+.report-launcher-imprevistos .report-card-icon {
+    color: #F97316;
+}
+
+/* Card de Exportação para IA */
+.report-launcher-ai {
+    border-color: rgba(139, 92, 246, 0.4); /* Roxo suave / Violeta indicando IA */
+}
+.report-launcher-ai:hover {
+    border-color: rgba(139, 92, 246, 0.75);
+    box-shadow: 0 8px 24px rgba(139, 92, 246, 0.18);
+}
+.report-launcher-ai .report-card-icon {
+    color: #8B5CF6; 
+}
+
+/* Label do mês */
+.imprev-month-label {
+    font-size: 0.78rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: var(--text-light);
+    text-align: center;
+    margin-bottom: 0.8rem;
+}
+
+/* Display grande do percentual */
+.imprev-big-display {
+    text-align: center;
+    margin-bottom: 1.6rem;
+}
+
+.imprev-big-pct {
+    display: block;
+    font-family: 'Playfair Display', serif;
+    font-size: 3.2rem;
+    font-weight: 700;
+    line-height: 1;
+    transition: color 0.3s ease;
+}
+
+.imprev-big-pct small {
+    font-size: 1.6rem;
+    font-weight: 600;
+}
+
+.imprev-big-display.status-ok    .imprev-big-pct { color: var(--success); }
+.imprev-big-display.status-warning .imprev-big-pct { color: var(--warning); }
+.imprev-big-display.status-danger  .imprev-big-pct { color: var(--danger); }
+
+.imprev-big-sub {
+    display: block;
+    font-size: 0.82rem;
+    color: var(--text-light);
+    margin-top: 0.4rem;
+}
+
+/* Barra de pressão — Termômetro */
+.imprev-gauge-wrap {
+    margin-bottom: 1.6rem;
+}
+
+.imprev-gauge-track {
+    position: relative;
+    display: flex;
+    height: 20px;
+    border-radius: 10px;
+    overflow: visible;
+    border: 1px solid var(--border);
+    background: var(--bg);
+}
+
+.imprev-zone {
+    height: 100%;
+    transition: width 0.5s ease;
+}
+
+.imprev-zone:first-child { border-radius: 10px 0 0 10px; }
+
+.imprev-zone-ok   { background: rgba(76, 175, 124, 0.55); }
+.imprev-zone-warn { background: rgba(212, 164, 80, 0.60); }
+.imprev-zone-over { background: rgba(224, 82,  82, 0.55); border-radius: 0 10px 10px 0; }
+
+/* Marcador / Agulha */
+.imprev-marker {
+    position: absolute;
+    top: -6px;
+    transform: translateX(-50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    z-index: 10;
+    transition: left 0.6s ease;
+}
+
+.imprev-marker-needle {
+    width: 3px;
+    height: 32px;
+    background: var(--text);
+    border-radius: 2px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+}
+
+.imprev-marker-bubble {
+    margin-top: 4px;
+    padding: 0.2rem 0.5rem;
+    border-radius: 6px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    white-space: nowrap;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.18);
+}
+
+.status-bubble-ok      { background: var(--success); color: #fff; }
+.status-bubble-warning { background: var(--warning);  color: #1C1A17; }
+.status-bubble-danger  { background: var(--danger);   color: #fff; }
+
+/* Escala de labels */
+.imprev-gauge-scale {
+    position: relative;
+    display: flex;
+    justify-content: space-between;
+    margin-top: 2rem;
+    font-size: 0.72rem;
+    color: var(--text-light);
+    font-weight: 600;
+}
+
+/* Banner de alerta */
+.imprev-alert-banner {
+    display: flex;
+    gap: 1rem;
+    align-items: flex-start;
+    padding: 1.1rem 1.3rem;
+    border-radius: 10px;
+    margin-bottom: 1.4rem;
+    border-left: 4px solid transparent;
+}
+
+.imprev-alert-ok      { background: rgba(76,175,124,0.08);  border-left-color: var(--success); }
+.imprev-alert-warning { background: rgba(212,164,80,0.10);  border-left-color: var(--warning); }
+.imprev-alert-danger  { background: rgba(224,82,82,0.08);   border-left-color: var(--danger);  }
+
+.imprev-alert-icon {
+    font-size: 1.4rem;
+    line-height: 1;
+    flex-shrink: 0;
+    padding-top: 2px;
+}
+
+.imprev-alert-body strong {
+    display: block;
+    font-size: 0.9rem;
+    color: var(--text);
+    margin-bottom: 0.3rem;
+}
+
+.imprev-alert-body p {
+    font-size: 0.82rem;
+    color: var(--text-light);
+    line-height: 1.55;
+    margin: 0;
+}
+
+/* Linha de totais */
+.imprev-totals-row {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.9rem 1.1rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    margin-bottom: 1.5rem;
+}
+
+.imprev-total-item {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    text-align: center;
+}
+
+.imprev-total-item small {
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    color: var(--text-light);
+}
+
+.imprev-total-item strong {
+    font-size: 1rem;
+    font-family: 'Playfair Display', serif;
+}
+
+.imprev-total-divider {
+    width: 1px;
+    height: 36px;
+    background: var(--border);
+    flex-shrink: 0;
+}
+
+/* Subcategorias */
+.imprev-subs-section {
+    margin-top: 0.5rem;
+}
+
+.imprev-subs-title {
+    font-size: 0.78rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.7px;
+    color: var(--text-light);
+    margin-bottom: 0.9rem;
+    border: none;
+    padding: 0;
+}
+
+.imprev-subs-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.7rem;
+}
+
+.imprev-sub-row {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+}
+
+.imprev-sub-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.imprev-sub-name {
+    font-size: 0.87rem;
+    font-weight: 600;
+    color: var(--text);
+}
+
+.imprev-sub-value {
+    font-size: 0.87rem;
+    font-weight: 700;
+    color: #F97316;
+}
+
+.imprev-sub-bar-track {
+    height: 6px;
+    background: var(--bg);
+    border-radius: 4px;
+    overflow: hidden;
+    border: 1px solid var(--border);
+}
+
+.imprev-sub-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, rgba(249,115,22,0.6), #F97316);
+    border-radius: 4px;
+    transition: width 0.5s ease;
+}
+
+/* Responsivo mobile */
+@media (max-width: 480px) {
+    .imprev-big-pct       { font-size: 2.6rem; }
+    .imprev-alert-banner  { padding: 0.9rem 1rem; }
+    .imprev-totals-row    { padding: 0.75rem 0.9rem; }
+}
