@@ -3,36 +3,40 @@ let transactions = JSON.parse(localStorage.getItem('fin_transactions')) || [];
 let categories = JSON.parse(localStorage.getItem('fin_categories')) || ['Alimentação', 'Moradia', 'Transporte', 'Salário', 'Lazer'];
 let pinnedBudgets = JSON.parse(localStorage.getItem('fin_pinned_budgets')) || [];
 
+let _expenseCache = {}; // Cache para otimização de renderização
+
 /**
- * FUNÇÃO UTILITÁRIA GLOBAL — Fonte Única da Verdade para Gastos Mensais
+ * FUNÇÃO UTILITÁRIA GLOBAL — Fonte Única da Verdade para Gastos Mensais (Otimizada)
  */
-window.getMonthExpenses = function(mesAlvo, anoAlvo) {
+window.getMonthExpenses = function(mesAlvo, anoAlvo, includeUncategorized = false) {
+    const cacheKey = `${anoAlvo}-${mesAlvo}-${includeUncategorized}`;
+    if (_expenseCache[cacheKey]) return _expenseCache[cacheKey];
+
     const expenses = {};
+    const mesStr = `${anoAlvo}-${String(mesAlvo + 1).padStart(2, '0')}`;
+
     transactions.forEach(t => {
         if (t.type !== 'despesa') return;
-        if (t.category.toLowerCase() === 'sem categoria') return;
+        if (!includeUncategorized && t.category.toLowerCase() === 'sem categoria') return;
 
         const d = new Date(t.date + 'T00:00:00');
         const tMonth = d.getMonth();
         const tYear = d.getFullYear();
 
         if (tYear === anoAlvo && tMonth === mesAlvo) {
-            const mesStr = `${anoAlvo}-${String(mesAlvo + 1).padStart(2, '0')}`;
             if (t.skippedDates && t.skippedDates.some(sd => sd.startsWith(mesStr))) return;
             expenses[t.category] = (expenses[t.category] || 0) + t.amount;
             return;
         }
 
         if (t.isRecurring && (tYear < anoAlvo || (tYear === anoAlvo && tMonth < mesAlvo))) {
-            if (t.recurrenceEndDate) {
-                const fim = new Date(t.recurrenceEndDate);
-                if (new Date(anoAlvo, mesAlvo, 1) >= fim) return;
-            }
-            const mesStr = `${anoAlvo}-${String(mesAlvo + 1).padStart(2, '0')}`;
+            if (t.recurrenceEndDate && new Date(anoAlvo, mesAlvo, 1) >= new Date(t.recurrenceEndDate)) return;
             if (t.skippedDates && t.skippedDates.some(sd => sd.startsWith(mesStr))) return;
             expenses[t.category] = (expenses[t.category] || 0) + t.amount;
         }
     });
+
+    _expenseCache[cacheKey] = expenses; // Armazena no cache
     return expenses;
 };
 
@@ -314,6 +318,7 @@ window.showView = function(targetView) {
 function saveData() {
     localStorage.setItem('fin_transactions', JSON.stringify(transactions));
     localStorage.setItem('fin_categories', JSON.stringify(categories));
+    _expenseCache = {}; // Invalida o cache ao salvar mutações no BD
 }
 
 function updateAllViews() {
@@ -419,33 +424,6 @@ function _updateChartMonthChip(mes, ano) {
     chip.textContent = nome.charAt(0).toUpperCase() + nome.slice(1);
 }
 
-function _getMonthExpensesAll(mesAlvo, anoAlvo) {
-    const expenses = {};
-    transactions.forEach(t => {
-        if (t.type !== 'despesa') return;
-        const d = new Date(t.date + 'T00:00:00');
-        const tMonth = d.getMonth();
-        const tYear  = d.getFullYear();
-
-        if (tYear === anoAlvo && tMonth === mesAlvo) {
-            const mesStr = `${anoAlvo}-${String(mesAlvo + 1).padStart(2, '0')}`;
-            if (t.skippedDates && t.skippedDates.some(sd => sd.startsWith(mesStr))) return;
-            expenses[t.category] = (expenses[t.category] || 0) + t.amount;
-            return;
-        }
-        if (t.isRecurring && (tYear < anoAlvo || (tYear === anoAlvo && tMonth < mesAlvo))) {
-            if (t.recurrenceEndDate) {
-                const fim = new Date(t.recurrenceEndDate);
-                if (new Date(anoAlvo, mesAlvo, 1) >= fim) return;
-            }
-            const mesStr = `${anoAlvo}-${String(mesAlvo + 1).padStart(2, '0')}`;
-            if (t.skippedDates && t.skippedDates.some(sd => sd.startsWith(mesStr))) return;
-            expenses[t.category] = (expenses[t.category] || 0) + t.amount;
-        }
-    });
-    return expenses;
-}
-
 function _toggleGroupRows(groupId) {
     const children = document.querySelectorAll(`[data-child-of="${groupId}"]`);
     const chevron  = document.getElementById(`chv-${groupId}`);
@@ -474,7 +452,7 @@ function _renderChartContent(mes, ano) {
 
     const fmt = v => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
-    const gastos  = _getMonthExpensesAll(mes, ano);
+    const gastos = getMonthExpenses(mes, ano, true);
     const receitas = getMonthIncome(mes, ano);
 
     const totalExp = Object.values(gastos).reduce((s, v) => s + v, 0);
@@ -697,32 +675,58 @@ function renderPinnedBudgets(gastosDoMes, mesAtual, anoAtual) {
     if (!container) return;
     if (mesAtual === undefined) mesAtual = new Date().getMonth();
     if (anoAtual === undefined) anoAtual = new Date().getFullYear();
-    const rawBudgets = JSON.parse(localStorage.getItem('fin_budgets')) || [];
+    
+    // Evita localStorage síncrono. Usa módulo em memória.
+    const activeBudgets = (typeof BudgetModule !== 'undefined') ? BudgetModule.getBudgets() : [];
+    
     if (pinnedBudgets.length === 0) {
-        container.innerHTML = '<p style="color: var(--text-light); font-size: 0.9rem; width: 100%; text-align: center; padding: 1rem;">Nenhum orçamento fixado. Use a engrenagem para configurar.</p>';
+        container.innerHTML = '<p style="color: var(--text-light); text-align: center; padding: 1rem;">Nenhum orçamento fixado.</p>';
         return;
     }
+
+    const hoje = new Date();
+    const isMesCorrente = (mesAtual === hoje.getMonth() && anoAtual === hoje.getFullYear());
+    const diasNoMes = new Date(anoAtual, mesAtual + 1, 0).getDate();
+    const tempoPercorrido = isMesCorrente ? Math.min((hoje.getDate() / diasNoMes) * 100, 100) : null;
+
     const currentYearMonth = `${anoAtual}-${String(mesAtual + 1).padStart(2, '0')}`;
+
     container.innerHTML = pinnedBudgets.map(cat => {
-        const budget = rawBudgets.find(b => b.category === cat && (b.type === 'mensal' || b.targetMonth === currentYearMonth));
+        const budget = activeBudgets.find(b => b.category === cat && (b.type === 'mensal' || b.targetMonth === currentYearMonth));
         const spent = gastosDoMes[cat] || 0;
         const limit = budget ? budget.amount : 0;
         const percent = limit > 0 ? Math.min((spent / limit) * 100, 100) : (spent > 0 ? 100 : 0);
-        let status = limit > 0 ? (percent > 90 ? 'status-danger' : (percent > 70 ? 'status-warning' : 'status-ok')) : (spent > 0 ? 'status-danger' : 'status-ok');
+        
+        let status = 'status-ok';
+        if (limit > 0) {
+            if (isMesCorrente && percent > (tempoPercorrido + 10)) status = 'status-warning';
+            if (percent > 90) status = 'status-danger';
+        } else {
+            if (spent > 0) status = 'status-danger';
+        }
+
+        const pacingHTML = (limit > 0 && isMesCorrente) ? `
+            <div class="pace-indicator" title="Ritmo: Tempo vs Consumo">
+                <div class="pace-track">
+                    <div class="pace-time-bar" style="width: ${tempoPercorrido}%;"></div>
+                    <div class="pace-spend-bar ${status}" style="width: ${percent}%;"></div>
+                </div>
+                <div class="pace-labels">
+                    <span>⏱ ${tempoPercorrido.toFixed(0)}% do mês</span>
+                    <span>💸 ${percent.toFixed(0)}% consumido</span>
+                </div>
+            </div>` : `
+            <div class="progress-track" style="height: 6px; margin-top: 8px;">
+                <div class="progress-fill ${status}" style="width: ${percent}%;"></div>
+            </div>`;
+
         return `
             <div class="pinned-card">
                 <div class="pinned-card-header">
-                    <button
-                        class="pinned-category-btn"
-                        onclick="openCategoryTransactions('${cat.replace(/'/g, "\\'")}', ${mesAtual}, ${anoAtual})"
-                        title="Ver lançamentos de ${cat}">
-                        ${cat}
-                    </button>
+                    <button class="pinned-category-btn" onclick="openCategoryTransactions('${cat.replace(/'/g, "\\'")}', ${mesAtual}, ${anoAtual})">${cat}</button>
                     <span>${spent.toLocaleString('pt-BR', {style: 'currency', currency: 'BRL'})} / ${limit > 0 ? limit.toLocaleString('pt-BR', {style: 'currency', currency: 'BRL'}) : 'Sem Meta'}</span>
                 </div>
-                <div class="progress-track" style="height: 8px; background: rgba(255, 255, 255, 0.1); border-radius: 4px; overflow: hidden;">
-                    <div class="progress-fill ${status}" style="width: ${percent}%; height: 100%; transition: width 0.5s ease;"></div>
-                </div>
+                ${pacingHTML}
             </div>`;
     }).join('');
 }

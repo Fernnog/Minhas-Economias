@@ -31,6 +31,39 @@ const BudgetModule = (function() {
         const isPinned  = currentPinned.includes(budget.category);
         const remaining = budget.amount - spent;
 
+        // Cálculos de Pacing baseados no contexto do mês atual
+        const hoje = new Date();
+        const currentYearMonth = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}`;
+        let isMesCorrente = true;
+        
+        const picker = document.getElementById('budget-month-picker');
+        if (picker && picker.value && picker.value !== currentYearMonth) {
+            isMesCorrente = false;
+        }
+        
+        const diasNoMes = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0).getDate();
+        const tempoPercorrido = isMesCorrente ? Math.min((hoje.getDate() / diasNoMes) * 100, 100) : null;
+        
+        let displayStatus = status;
+        if (budget.amount > 0 && isMesCorrente && percent > (tempoPercorrido + 10) && percent <= 90) {
+            displayStatus = 'status-warning';
+        }
+
+        const pacingHTML = (budget.amount > 0 && isMesCorrente) ? `
+            <div class="pace-indicator" title="Ritmo: Tempo vs Consumo">
+                <div class="pace-track">
+                    <div class="pace-time-bar" style="width: ${tempoPercorrido}%;"></div>
+                    <div class="pace-spend-bar ${displayStatus}" style="width: ${percent}%;"></div>
+                </div>
+                <div class="pace-labels" style="margin-bottom: 0.2rem;">
+                    <span>⏱ ${tempoPercorrido.toFixed(0)}% do mês</span>
+                    <span>💸 ${percent.toFixed(0)}% consumido</span>
+                </div>
+            </div>` : `
+            <div class="progress-track">
+                <div class="progress-fill ${displayStatus}" style="width:${percent}%;"></div>
+            </div>`;
+
         const microCopy = budget.amount > 0
             ? (percent >= 100
                 ? `<span class="budget-micro-copy danger-text">⚠ Orçamento esgotado</span>`
@@ -44,7 +77,7 @@ const BudgetModule = (function() {
                 <div class="budget-meta-header">
                     <div class="budget-meta-info">
                         <strong style="display:flex;align-items:center;gap:0.3rem;">
-                            ${STATUS_ICONS[status]}
+                            ${STATUS_ICONS[displayStatus]}
                             ${budget.category}
                             <small style="font-weight:400;">${budget.type === 'mensal' ? '(Recorrente)' : '(Apenas este mês)'}</small>
                         </strong>
@@ -69,9 +102,7 @@ const BudgetModule = (function() {
                         </button>
                     </div>
                 </div>
-                <div class="progress-track">
-                    <div class="progress-fill ${status}" style="width:${percent}%;"></div>
-                </div>
+                ${pacingHTML}
                 ${microCopy}
             </div>`;
     }
@@ -201,65 +232,75 @@ const BudgetModule = (function() {
         const title = document.getElementById('budget-summary-title');
         const content = document.getElementById('budget-summary-content');
 
-        if (!dialog || !title || !content) {
-            console.error('Dialog de resumo de orçamento não encontrado.');
-            return;
-        }
+        if (!dialog || !title || !content) return;
 
         title.innerText = `Resumo: ${parentName}`;
         
-        let currentMonth = new Date().getMonth();
-        let currentYear = new Date().getFullYear();
-        const picker = document.getElementById('budget-month-picker');
-        if (picker && picker.value) {
-            const [y, m] = picker.value.split('-');
-            currentMonth = parseInt(m) - 1;
-            currentYear = parseInt(y);
-        }
-
-        let historyHtml = '<div class="summary-history" style="display:flex; flex-direction:column; gap:0.5rem; margin-top:1rem;">';
-        let total3Months = 0;
-        
-        for (let i = 2; i >= 0; i--) {
-            let m = currentMonth - i;
-            let y = currentYear;
-            if (m < 0) {
-                m += 12;
-                y -= 1;
-            }
-            
-            let monthSpent = 0;
-            if (typeof window.getMonthExpenses === 'function') {
-                const histExp = window.getMonthExpenses(m, y);
-                budgetLimits.forEach(b => {
-                     if (typeof CategoryGroups !== 'undefined') {
-                         const p = CategoryGroups.getParentOf(b.category);
-                         if ((p && p.id === groupId) || (!p && groupId === 'ungrouped')) {
-                             monthSpent += (histExp[b.category] || 0);
-                         }
-                     }
-                });
-            }
-            total3Months += monthSpent;
-            
-            const dateObj = new Date(y, m, 1);
-            const monthName = dateObj.toLocaleDateString('pt-BR', { month: 'short' });
-            historyHtml += `<div style="display:flex; justify-content:space-between; padding:0.5rem; background:var(--surface); border-radius:6px; border:1px solid var(--border);"><span>${monthName}/${y}</span><strong>${monthSpent.toLocaleString('pt-BR', {style:'currency', currency:'BRL'})}</strong></div>`;
-        }
-        
-        const avg = total3Months / 3;
-        historyHtml += `</div>`;
-        
+        // 1. Renderiza o Skeleton Loading e abre o modal imediatamente
         content.innerHTML = `
-            ${historyHtml}
-            <div style="margin-top:1rem; padding-top:1rem; border-top:1px solid var(--border);">
-                <p style="display:flex; justify-content:space-between;"><span>Média (3 meses):</span> <strong>${avg.toLocaleString('pt-BR', {style:'currency', currency:'BRL'})}</strong></p>
-                <p style="display:flex; justify-content:space-between; margin-top:0.5rem;"><span>Orçamento Atual:</span> <strong>${budgeted.toLocaleString('pt-BR', {style:'currency', currency:'BRL'})}</strong></p>
-                ${avg > budgeted ? `<p class="danger-text" style="margin-top:1rem; font-size:0.9rem; text-align:center;">⚠ O orçamento atual está abaixo da média histórica.</p>` : `<p style="color:var(--success); margin-top:1rem; font-size:0.9rem; text-align:center;">✅ O orçamento parece realista em relação ao histórico.</p>`}
+            <div style="margin-top: 1rem;">
+                <div class="skeleton-box" style="width: 100%;"></div>
+                <div class="skeleton-box" style="width: 100%;"></div>
+                <div class="skeleton-box" style="width: 100%;"></div>
             </div>
+            <div style="text-align: center; font-size: 0.8rem; color: var(--text-light); margin-top: 1rem;">Calculando histórico...</div>
         `;
-        
         dialog.showModal();
+
+        // 2. Libera a Thread de UI e executa cálculo pesado de forma assíncrona
+        setTimeout(() => {
+            let currentMonth = new Date().getMonth();
+            let currentYear = new Date().getFullYear();
+            const picker = document.getElementById('budget-month-picker');
+            if (picker && picker.value) {
+                const [y, m] = picker.value.split('-');
+                currentMonth = parseInt(m) - 1;
+                currentYear = parseInt(y);
+            }
+
+            let historyHtml = '<div class="summary-history" style="display:flex; flex-direction:column; gap:0.5rem; margin-top:1rem;">';
+            let total3Months = 0;
+            
+            for (let i = 2; i >= 0; i--) {
+                let m = currentMonth - i;
+                let y = currentYear;
+                if (m < 0) {
+                    m += 12;
+                    y -= 1;
+                }
+                
+                let monthSpent = 0;
+                if (typeof window.getMonthExpenses === 'function') {
+                    // O(1) com a nova arquitetura do Cache
+                    const histExp = window.getMonthExpenses(m, y);
+                    budgetLimits.forEach(b => {
+                         if (typeof CategoryGroups !== 'undefined') {
+                             const p = CategoryGroups.getParentOf(b.category);
+                             if ((p && p.id === groupId) || (!p && groupId === 'ungrouped')) {
+                                 monthSpent += (histExp[b.category] || 0);
+                             }
+                         }
+                    });
+                }
+                total3Months += monthSpent;
+                
+                const dateObj = new Date(y, m, 1);
+                const monthName = dateObj.toLocaleDateString('pt-BR', { month: 'short' });
+                historyHtml += `<div style="display:flex; justify-content:space-between; padding:0.5rem; background:var(--surface); border-radius:6px; border:1px solid var(--border);"><span>${monthName}/${y}</span><strong>${monthSpent.toLocaleString('pt-BR', {style:'currency', currency:'BRL'})}</strong></div>`;
+            }
+            
+            const avg = total3Months / 3;
+            historyHtml += `</div>`;
+            
+            content.innerHTML = `
+                ${historyHtml}
+                <div style="margin-top:1rem; padding-top:1rem; border-top:1px solid var(--border);">
+                    <p style="display:flex; justify-content:space-between;"><span>Média (3 meses):</span> <strong>${avg.toLocaleString('pt-BR', {style:'currency', currency:'BRL'})}</strong></p>
+                    <p style="display:flex; justify-content:space-between; margin-top:0.5rem;"><span>Orçamento Atual:</span> <strong>${budgeted.toLocaleString('pt-BR', {style:'currency', currency:'BRL'})}</strong></p>
+                    ${avg > budgeted ? `<p class="danger-text" style="margin-top:1rem; font-size:0.9rem; text-align:center;">⚠ O orçamento atual está abaixo da média histórica.</p>` : `<p style="color:var(--success); margin-top:1rem; font-size:0.9rem; text-align:center;">✅ O orçamento parece realista em relação ao histórico.</p>`}
+                </div>
+            `;
+        }, 15); // O microdelay devolve o frame para a GPU renderizar o Modal abrindo liso
     }
 
     // ── Restante das Funções Originais ──────────
@@ -496,5 +537,5 @@ const BudgetModule = (function() {
         render(); 
     }
 
-    return { init, render, edit, remove, updateCategoryOptions, loadFromStorage, togglePin, toggleBudgetGroup, showGroupSummary };
+    return { getBudgets: () => budgetLimits, init, render, edit, remove, updateCategoryOptions, loadFromStorage, togglePin, toggleBudgetGroup, showGroupSummary };
 })();
