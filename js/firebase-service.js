@@ -216,6 +216,15 @@ const FirebaseModule = (function() {
                 if (typeof SyncModule !== 'undefined') SyncModule.loadFromCloud(data.dates);
             }
 
+            // --- Sincronizar Configurações do Projetor de Gastos (Pacing) ---
+            const projectorRef = await db.collection('users').doc(uid).collection('preferences').doc('projector').get();
+            if (projectorRef.exists) {
+                const prefData = projectorRef.data();
+                if (prefData && prefData.data) {
+                    localStorage.setItem('fin_projector_config', JSON.stringify(prefData.data));
+                }
+            }
+
             // F) Sincronizar Status de Conferência do Extrato
             const confRef = await db.collection('users').doc(uid).collection('preferences').doc('confirmed_items').get();
             if (confRef.exists) {
