@@ -257,6 +257,12 @@ function init() {
     }
 
     updateAllViews();
+
+    setTimeout(() => {
+        if (typeof BudgetProjectorModule !== 'undefined') {
+            BudgetProjectorModule.checkAndNotify();
+        }
+    }, 1200);
 }
 
 window.showDashboard = function() {
