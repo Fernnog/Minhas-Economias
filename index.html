@@ -479,6 +479,18 @@
                                 <span class="report-card-cta">Extrair Dados →</span>
                             </button>
 
+                            <button class="report-launcher-card report-launcher-projector" onclick="BudgetProjectorModule.openConfig()">
+                                <div class="report-card-icon">
+                                    <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                                        <circle cx="12" cy="12" r="10"></circle>
+                                        <polyline points="12 6 12 12 16 14"></polyline>
+                                    </svg>
+                                </div>
+                                <h4 class="report-card-title">Projetor de Gastos (Pacing)</h4>
+                                <p class="report-card-desc">Monitore a velocidade dos gastos do seu ciclo financeiro e receba alertas proativos.</p>
+                                <span class="report-card-cta">Configurar Projetor →</span>
+                            </button>
+
                         </div>
                     </div>
                 </section>
@@ -586,6 +598,22 @@
         </div>
     </dialog>
 
+    <dialog id="projector-dialog" class="report-dialog">
+        <div class="dialog-header">
+            <h3>Configuração do Projetor</h3>
+            <button class="close-dialog" onclick="document.getElementById('projector-dialog').close()">&times;</button>
+        </div>
+        <div class="report-dialog-body">
+            <div style="margin-bottom: 1.5rem; background: var(--surface); padding: 1.2rem; border-radius: 8px; border: 1px solid var(--border);">
+                <label style="display: block; margin-bottom: 0.5rem; font-weight: 700;">Início do Ciclo (Dia da Fatura/Salário)</label>
+                <input type="number" id="projector-cycle-day" min="1" max="31" class="form-select-sm" style="width: 100px;">
+            </div>
+            <h4 style="margin-bottom: 0.8rem; font-size: 0.95rem;">Orçamentos Monitorados</h4>
+            <div id="projector-cat-list" style="display: flex; flex-direction: column; gap: 0.5rem; max-height: 250px; overflow-y: auto; margin-bottom: 1.5rem;"></div>
+            <button class="btn-block btn-dark-gold" onclick="BudgetProjectorModule.saveConfig()">Salvar Configurações</button>
+        </div>
+    </dialog>
+
     <div id="toast-container" class="toast-container"></div>
 
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-app-compat.js"></script>
@@ -604,6 +632,7 @@
     <script src="js/budget.js"></script>
     <script src="js/extract.js"></script>
     <script src="js/reports.js"></script>
+    <script src="js/budget-projector.js"></script>
     <script src="js/script.js"></script>
 </body>
 </html>
