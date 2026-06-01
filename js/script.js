@@ -693,27 +693,49 @@ function renderPinnedBudgets(gastosDoMes, mesAtual, anoAtual) {
 
     container.innerHTML = pinnedBudgets.map(cat => {
         const budget = activeBudgets.find(b => b.category === cat && (b.type === 'mensal' || b.targetMonth === currentYearMonth));
-        const spent = gastosDoMes[cat] || 0;
-        const limit = budget ? budget.amount : 0;
-        const percent = limit > 0 ? Math.min((spent / limit) * 100, 100) : (spent > 0 ? 100 : 0);
         
+        // 1. Estado Base (Calendário)
+        let spent = gastosDoMes[cat] || 0;
+        let limit = budget ? budget.amount : 0;
+        let percent = limit > 0 ? Math.min((spent / limit) * 100, 100) : (spent > 0 ? 100 : 0);
+        let timePct = isMesCorrente ? Math.min((hoje.getDate() / diasNoMes) * 100, 100) : null;
+        let isPacingActive = (limit > 0 && isMesCorrente); // Default do calendário
+        let cycleInfoHTML = "";
+
+        // 2. Interceptação do Projetor (Ciclo Personalizado)
+        if (typeof BudgetProjectorModule !== 'undefined') {
+            const cycleStats = BudgetProjectorModule.getCategoryCycleStats(cat);
+            if (cycleStats.isTracked) {
+                spent = cycleStats.spentAmount;
+                percent = cycleStats.spentPct;
+                timePct = cycleStats.timePct;
+                isPacingActive = true; // Desacopla da variável do calendário visualizado
+                cycleInfoHTML = `<span class="cycle-badge" title="Período do ciclo: ${cycleStats.cycleLabel}">Ciclo: ${cycleStats.cycleLabel}</span>`;
+            }
+        }
+        
+        // 3. Derivação Final de Estado
         let status = 'status-ok';
         if (limit > 0) {
-            if (isMesCorrente && percent > (tempoPercorrido + 10)) status = 'status-warning';
+            if (isPacingActive && percent > (timePct + 10)) status = 'status-warning';
             if (percent > 90) status = 'status-danger';
         } else {
             if (spent > 0) status = 'status-danger';
         }
 
-        const pacingHTML = (limit > 0 && isMesCorrente) ? `
+        // 4. Renderização HTML
+        const pacingHTML = isPacingActive ? `
             <div class="pace-indicator" title="Ritmo: Tempo vs Consumo">
                 <div class="pace-track">
-                    <div class="pace-time-bar" style="width: ${tempoPercorrido}%;"></div>
+                    <div class="pace-time-bar" style="width: ${timePct}%;"></div>
                     <div class="pace-spend-bar ${status}" style="width: ${percent}%;"></div>
                 </div>
-                <div class="pace-labels">
-                    <span>⏱ ${tempoPercorrido.toFixed(0)}% do mês</span>
-                    <span>💸 ${percent.toFixed(0)}% consumido</span>
+                <div class="pace-labels" style="display:flex; justify-content:space-between; align-items:center;">
+                    <div style="display:flex; flex-direction:column;">
+                        <span>⏱ ${timePct.toFixed(0)}% do tempo</span>
+                        <span>💸 ${percent.toFixed(0)}% consumido</span>
+                    </div>
+                    ${cycleInfoHTML}
                 </div>
             </div>` : `
             <div class="progress-track" style="height: 6px; margin-top: 8px;">

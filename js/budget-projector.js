@@ -29,24 +29,43 @@ const BudgetProjectorModule = (function() {
             const d = new Date(t.date + 'T00:00:00');
             
             if (t.isRecurring) {
-                // Simplificação: para recorrências, projetamos a data dentro do mês de 'start' e 'end'
-                const projDate = new Date(start.getFullYear(), start.getMonth(), d.getDate());
-                if (projDate >= start && projDate <= end) {
-                    if (!t.recurrenceEndDate || projDate < new Date(t.recurrenceEndDate)) {
-                        total += t.amount;
-                    }
-                }
-                const projDateNext = new Date(end.getFullYear(), end.getMonth(), d.getDate());
-                if (projDateNext > projDate && projDateNext >= start && projDateNext <= end) {
-                    if (!t.recurrenceEndDate || projDateNext < new Date(t.recurrenceEndDate)) {
-                        total += t.amount;
-                    }
-                }
+                const projDate1 = new Date(start.getFullYear(), start.getMonth(), d.getDate());
+                const projDate2 = new Date(end.getFullYear(), end.getMonth(), d.getDate());
+                
+                if (projDate1 >= start && projDate1 <= end && (!t.recurrenceEndDate || projDate1 < new Date(t.recurrenceEndDate))) total += t.amount;
+                if (projDate2 > projDate1 && projDate2 >= start && projDate2 <= end && (!t.recurrenceEndDate || projDate2 < new Date(t.recurrenceEndDate))) total += t.amount;
             } else {
                 if (d >= start && d <= end) total += t.amount;
             }
         });
         return total;
+    }
+
+    function getCategoryCycleStats(category) {
+        if (!_config.categories.includes(category)) return { isTracked: false };
+
+        const today = new Date();
+        const { start, end } = _getCycleDates(today, _config.cycleDay);
+        const budgets = JSON.parse(localStorage.getItem('fin_budgets')) || [];
+        const budget = budgets.find(b => b.category === category);
+        
+        if (!budget) return { isTracked: false };
+
+        const totalDuration = end.getTime() - start.getTime();
+        const elapsedDuration = today.getTime() - start.getTime();
+        
+        const timePct = Math.min((elapsedDuration / totalDuration) * 100, 100);
+        const spentAmount = _getExpensesInDateRange(start, end, category);
+        const spentPct = Math.min((spentAmount / budget.amount) * 100, 100);
+
+        return {
+            isTracked: true,
+            timePct,
+            spentPct,
+            spentAmount,
+            limit: budget.amount,
+            cycleLabel: `${String(start.getDate()).padStart(2, '0')}/${String(start.getMonth()+1).padStart(2, '0')} a ${String(end.getDate()).padStart(2, '0')}/${String(end.getMonth()+1).padStart(2, '0')}`
+        };
     }
 
     // --- API Pública ---
@@ -67,7 +86,9 @@ const BudgetProjectorModule = (function() {
     }
 
     function saveConfig() {
-        const day = parseInt(document.getElementById('projector-cycle-day').value) || 1;
+        let day = parseInt(document.getElementById('projector-cycle-day').value) || 1;
+        // CLAMP: Impede overflow da API Date em meses curtos (ex: fevereiro). 
+        day = Math.max(1, Math.min(day, 28)); 
         const checkboxes = document.querySelectorAll('#projector-cat-list input[type="checkbox"]:checked');
         const cats = Array.from(checkboxes).map(cb => cb.value);
         
@@ -126,5 +147,5 @@ const BudgetProjectorModule = (function() {
         });
     }
 
-    return { openConfig, saveConfig, checkAndNotify };
+    return { openConfig, saveConfig, checkAndNotify, getCategoryCycleStats };
 })();

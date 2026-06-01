@@ -25,13 +25,10 @@ const BudgetModule = (function() {
 
     function _renderSingleRow(budget, monthlyExpenses, currentPinned) {
         const fmt = v => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-        const spent   = monthlyExpenses[budget.category] || 0;
-        const percent = Math.min((spent / budget.amount) * 100, 100);
-        const status  = percent > 90 ? 'status-danger' : (percent > 70 ? 'status-warning' : 'status-ok');
-        const isPinned  = currentPinned.includes(budget.category);
-        const remaining = budget.amount - spent;
-
-        // Cálculos de Pacing baseados no contexto do mês atual
+        // 1. Estado Base (Refatorado para LET, permitindo interceptação)
+        let spent = monthlyExpenses[budget.category] || 0;
+        let percent = Math.min((spent / budget.amount) * 100, 100);
+        
         const hoje = new Date();
         const currentYearMonth = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}`;
         let isMesCorrente = true;
@@ -42,21 +39,41 @@ const BudgetModule = (function() {
         }
         
         const diasNoMes = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0).getDate();
-        const tempoPercorrido = isMesCorrente ? Math.min((hoje.getDate() / diasNoMes) * 100, 100) : null;
+        let tempoPercorrido = isMesCorrente ? Math.min((hoje.getDate() / diasNoMes) * 100, 100) : null;
+        let isPacingActive = (budget.amount > 0 && isMesCorrente);
+        let cycleInfoHTML = "";
+
+        // 2. Interceptação do Projetor
+        if (typeof BudgetProjectorModule !== 'undefined') {
+            const cycleStats = BudgetProjectorModule.getCategoryCycleStats(budget.category);
+            if (cycleStats.isTracked) {
+                spent = cycleStats.spentAmount;
+                percent = cycleStats.spentPct;
+                tempoPercorrido = cycleStats.timePct;
+                isPacingActive = true;
+                cycleInfoHTML = `<span class="cycle-badge" style="margin-left:8px;" title="Período do ciclo: ${cycleStats.cycleLabel}">(Ciclo: ${cycleStats.cycleLabel})</span>`;
+            }
+        }
+
+        // 3. Derivação Final de Estado (Movido para DEPOIS da interceptação)
+        const remaining = budget.amount - spent;
+        let displayStatus = percent > 90 ? 'status-danger' : (percent > 70 ? 'status-warning' : 'status-ok');
         
-        let displayStatus = status;
-        if (budget.amount > 0 && isMesCorrente && percent > (tempoPercorrido + 10) && percent <= 90) {
+        if (isPacingActive && percent > (tempoPercorrido + 10) && percent <= 90) {
             displayStatus = 'status-warning';
         }
 
-        const pacingHTML = (budget.amount > 0 && isMesCorrente) ? `
+        const isPinned = currentPinned.includes(budget.category);
+
+        // 4. Renderização
+        const pacingHTML = isPacingActive ? `
             <div class="pace-indicator" title="Ritmo: Tempo vs Consumo">
                 <div class="pace-track">
                     <div class="pace-time-bar" style="width: ${tempoPercorrido}%;"></div>
                     <div class="pace-spend-bar ${displayStatus}" style="width: ${percent}%;"></div>
                 </div>
                 <div class="pace-labels" style="margin-bottom: 0.2rem;">
-                    <span>⏱ ${tempoPercorrido.toFixed(0)}% do mês</span>
+                    <span>⏱ ${tempoPercorrido.toFixed(0)}% do tempo</span>
                     <span>💸 ${percent.toFixed(0)}% consumido</span>
                 </div>
             </div>` : `
@@ -79,7 +96,8 @@ const BudgetModule = (function() {
                         <strong style="display:flex;align-items:center;gap:0.3rem;">
                             ${STATUS_ICONS[displayStatus]}
                             ${budget.category}
-                            <small style="font-weight:400;">${budget.type === 'mensal' ? '(Recorrente)' : '(Apenas este mês)'}</small>
+                            <small style="font-weight:400;">${budget.type === 'mensal' ? '(Recorrente)' : '(Este mês)'}</small>
+                            ${cycleInfoHTML}
                         </strong>
                         <span style="font-size:0.9rem;font-weight:500;color:var(--text-light);">
                             ${fmt(spent)} / ${fmt(budget.amount)}
