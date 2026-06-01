@@ -926,6 +926,20 @@ dialog::backdrop { background: rgba(15, 23, 42, 0.5); backdrop-filter: blur(4px)
 .danger-text  { color: var(--danger) !important; }
 .warning-text { color: var(--warning) !important; }
 
+/* Badge indicadora do Projetor de Gastos (Ciclo Personalizado) */
+.cycle-badge {
+    font-size: 0.7rem;
+    color: var(--primary-dark);
+    background: rgba(201, 168, 76, 0.12);
+    border: 1px solid rgba(201, 168, 76, 0.3);
+    border-radius: 4px;
+    padding: 0.15rem 0.45rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    white-space: nowrap;
+}
+
 /* ── Orçamentos agrupados por Categoria Principal ─────────── */
 .budget-group-section {
     margin-bottom: 0.75rem;
