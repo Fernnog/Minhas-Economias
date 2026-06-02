@@ -25,7 +25,8 @@ const BudgetModule = (function() {
 
     function _renderSingleRow(budget, monthlyExpenses, currentPinned) {
         const fmt = v => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-        // 1. Estado Base (Refatorado para LET, permitindo interceptação)
+        
+        // 1. Estado Base (Mês Civil de Calendário)
         let spent = monthlyExpenses[budget.category] || 0;
         let percent = Math.min((spent / budget.amount) * 100, 100);
         
@@ -33,52 +34,61 @@ const BudgetModule = (function() {
         const currentYearMonth = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}`;
         let isMesCorrente = true;
         
+        // Determina a data de referência baseando-se no picker do orçamento
         const picker = document.getElementById('budget-month-picker');
-        if (picker && picker.value && picker.value !== currentYearMonth) {
-            isMesCorrente = false;
+        let referenceDate = new Date();
+        if (picker && picker.value) {
+            const [y, m] = picker.value.split('-');
+            isMesCorrente = (picker.value === currentYearMonth);
+            referenceDate = isMesCorrente ? new Date() : new Date(parseInt(y), parseInt(m) - 1, 15);
         }
         
-        const diasNoMes = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0).getDate();
+        const diasNoMes = new Date(referenceDate.getFullYear(), referenceDate.getMonth() + 1, 0).getDate();
         let tempoPercorrido = isMesCorrente ? Math.min((hoje.getDate() / diasNoMes) * 100, 100) : null;
         let isPacingActive = (budget.amount > 0 && isMesCorrente);
         let cycleInfoHTML = "";
 
-        // 2. Interceptação do Projetor
+        // Inicializa as variáveis de pacing herdando os valores padrão do calendário
+        let pacingPercent = percent;
+        let pacingStatus = percent > 90 ? 'status-danger' : (percent > 70 ? 'status-warning' : 'status-ok');
+
+        // 2. Interceptação do Projetor (Monitoramento do Ciclo do Cartão)
         if (typeof BudgetProjectorModule !== 'undefined') {
-            const cycleStats = BudgetProjectorModule.getCategoryCycleStats(budget.category);
+            const cycleStats = BudgetProjectorModule.getCategoryCycleStats(budget.category, referenceDate);
             if (cycleStats.isTracked) {
-                spent = cycleStats.spentAmount;
-                percent = cycleStats.spentPct;
-                tempoPercorrido = cycleStats.timePct;
+                // spent permanece INALTERADO (mês civil para texto)
+                pacingPercent = cycleStats.spentPct; // Usado para a renderização da barra de consumo
+                tempoPercorrido = cycleStats.timePct; // Usado para a linha cinza indicadora de tempo
                 isPacingActive = true;
                 cycleInfoHTML = `<span class="cycle-badge" style="margin-left:8px;" title="Período do ciclo: ${cycleStats.cycleLabel}">(Ciclo: ${cycleStats.cycleLabel})</span>`;
+                
+                // O status de aviso da barra responde exclusivamente ao ritmo do ciclo
+                pacingStatus = pacingPercent > 90 ? 'status-danger' : (pacingPercent > 70 ? 'status-warning' : 'status-ok');
+                if (pacingPercent > (tempoPercorrido + 10) && pacingPercent <= 90) {
+                    pacingStatus = 'status-warning';
+                }
             }
         }
 
-        // 3. Derivação Final de Estado (Movido para DEPOIS da interceptação)
+        // 3. Métricas de Exibição Textual (Estritamente baseadas no Mês Civil)
         const remaining = budget.amount - spent;
-        let displayStatus = percent > 90 ? 'status-danger' : (percent > 70 ? 'status-warning' : 'status-ok');
-        
-        if (isPacingActive && percent > (tempoPercorrido + 10) && percent <= 90) {
-            displayStatus = 'status-warning';
-        }
-
+        let textStatus = percent > 90 ? 'status-danger' : (percent > 70 ? 'status-warning' : 'status-ok');
         const isPinned = currentPinned.includes(budget.category);
 
-        // 4. Renderização
+        // Renderiza o indicador de ritmo com dados do ciclo, ou a barra convencional com dados do mês
         const pacingHTML = isPacingActive ? `
-            <div class="pace-indicator" title="Ritmo: Tempo vs Consumo">
+            <div class="pace-indicator" title="Ritmo: Tempo vs Consumo do Cartão">
                 <div class="pace-track">
                     <div class="pace-time-bar" style="width: ${tempoPercorrido}%;"></div>
-                    <div class="pace-spend-bar ${displayStatus}" style="width: ${percent}%;"></div>
+                    <div class="pace-spend-bar ${pacingStatus}" style="width: ${pacingPercent}%;"></div>
                 </div>
                 <div class="pace-labels" style="margin-bottom: 0.2rem;">
-                    <span>⏱ ${tempoPercorrido.toFixed(0)}% do tempo</span>
-                    <span>💸 ${percent.toFixed(0)}% consumido</span>
+                    <span>⏱ ${tempoPercorrido.toFixed(0)}% do tempo da fatura</span>
+                    <span>💸 ${pacingPercent.toFixed(0)}% consumido</span>
                 </div>
             </div>` : `
             <div class="progress-track">
-                <div class="progress-fill ${displayStatus}" style="width:${percent}%;"></div>
+                <div class="progress-fill ${textStatus}" style="width:${percent}%;"></div>
             </div>`;
 
         const microCopy = budget.amount > 0
@@ -94,7 +104,7 @@ const BudgetModule = (function() {
                 <div class="budget-meta-header">
                     <div class="budget-meta-info">
                         <strong style="display:flex;align-items:center;gap:0.3rem;">
-                            ${STATUS_ICONS[displayStatus]}
+                            ${STATUS_ICONS[textStatus]}
                             ${budget.category}
                             <small style="font-weight:400;">${budget.type === 'mensal' ? '(Recorrente)' : '(Este mês)'}</small>
                             ${cycleInfoHTML}
