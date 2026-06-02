@@ -46,24 +46,21 @@ const BudgetProjectorModule = (function() {
 
         const today = new Date();
         const { start, end } = _getCycleDates(today, _config.cycleDay);
+        
+        // Verifica se a categoria realmente possui um orçamento configurado
         const budgets = JSON.parse(localStorage.getItem('fin_budgets')) || [];
         const budget = budgets.find(b => b.category === category);
-        
         if (!budget) return { isTracked: false };
 
         const totalDuration = end.getTime() - start.getTime();
         const elapsedDuration = today.getTime() - start.getTime();
         
+        // Retorna APENAS os dados temporais do ciclo do cartão (O(1) - Alta performance)
         const timePct = Math.min((elapsedDuration / totalDuration) * 100, 100);
-        const spentAmount = _getExpensesInDateRange(start, end, category);
-        const spentPct = Math.min((spentAmount / budget.amount) * 100, 100);
 
         return {
             isTracked: true,
             timePct,
-            spentPct,
-            spentAmount,
-            limit: budget.amount,
             cycleLabel: `${String(start.getDate()).padStart(2, '0')}/${String(start.getMonth()+1).padStart(2, '0')} a ${String(end.getDate()).padStart(2, '0')}/${String(end.getMonth()+1).padStart(2, '0')}`
         };
     }

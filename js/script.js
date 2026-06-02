@@ -714,15 +714,16 @@ function renderPinnedBudgets(gastosDoMes, mesAtual, anoAtual) {
 
         // 2. Interceptação do Projetor (Ciclo de Fatura do Cartão)
         if (typeof BudgetProjectorModule !== 'undefined') {
-            const cycleStats = BudgetProjectorModule.getCategoryCycleStats(cat, referenceDate);
+            // CORREÇÃO: Removido o argumento 'referenceDate' fantasma
+            const cycleStats = BudgetProjectorModule.getCategoryCycleStats(cat);
             if (cycleStats.isTracked) {
-                // spent é preservado sem modificação síncrona
-                pacingPercent = cycleStats.spentPct; // Ritmo da barra de preenchimento
-                timePct = cycleStats.timePct; // Linha temporal vertical
+                // CORREÇÃO: O percentual financeiro herda a fonte única da verdade (mês civil)
+                pacingPercent = percent; 
+                timePct = cycleStats.timePct; // Ritmo temporal
                 isPacingActive = true;
                 cycleInfoHTML = `<span class="cycle-badge" title="Período do ciclo: ${cycleStats.cycleLabel}">Ciclo: ${cycleStats.cycleLabel}</span>`;
                 
-                // Determina o status da barra de preenchimento com base na velocidade do ciclo
+                // Determina o status da barra de preenchimento comparando Consumo (Financeiro) vs Tempo (Projetor)
                 pacingStatus = 'status-ok';
                 if (pacingPercent > 90) pacingStatus = 'status-danger';
                 else if (pacingPercent > (timePct + 10) || pacingPercent > 70) pacingStatus = 'status-warning';

@@ -54,15 +54,16 @@ const BudgetModule = (function() {
 
         // 2. Interceptação do Projetor (Monitoramento do Ciclo do Cartão)
         if (typeof BudgetProjectorModule !== 'undefined') {
-            const cycleStats = BudgetProjectorModule.getCategoryCycleStats(budget.category, referenceDate);
+            // CORREÇÃO: Removido o argumento 'referenceDate' fantasma
+            const cycleStats = BudgetProjectorModule.getCategoryCycleStats(budget.category);
             if (cycleStats.isTracked) {
-                // spent permanece INALTERADO (mês civil para texto)
-                pacingPercent = cycleStats.spentPct; // Usado para a renderização da barra de consumo
-                tempoPercorrido = cycleStats.timePct; // Usado para a linha cinza indicadora de tempo
+                // CORREÇÃO: O percentual financeiro herda a fonte única da verdade
+                pacingPercent = percent; 
+                tempoPercorrido = cycleStats.timePct; 
                 isPacingActive = true;
                 cycleInfoHTML = `<span class="cycle-badge" style="margin-left:8px;" title="Período do ciclo: ${cycleStats.cycleLabel}">(Ciclo: ${cycleStats.cycleLabel})</span>`;
                 
-                // O status de aviso da barra responde exclusivamente ao ritmo do ciclo
+                // O status de aviso da barra responde ao cruzamento do consumo vs tempo
                 pacingStatus = pacingPercent > 90 ? 'status-danger' : (pacingPercent > 70 ? 'status-warning' : 'status-ok');
                 if (pacingPercent > (tempoPercorrido + 10) && pacingPercent <= 90) {
                     pacingStatus = 'status-warning';
