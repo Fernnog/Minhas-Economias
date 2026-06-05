@@ -673,6 +673,7 @@ categoryForm?.addEventListener('submit', function(e) {
 function renderPinnedBudgets(gastosDoMes, mesAtual, anoAtual) {
     const container = document.getElementById('pinned-budgets-container');
     if (!container) return;
+    
     if (mesAtual === undefined) mesAtual = new Date().getMonth();
     if (anoAtual === undefined) anoAtual = new Date().getFullYear();
     
@@ -685,32 +686,44 @@ function renderPinnedBudgets(gastosDoMes, mesAtual, anoAtual) {
 
     const hoje = new Date();
     const isMesCorrente = (mesAtual === hoje.getMonth() && anoAtual === hoje.getFullYear());
-    const diasNoMes = new Date(anoAtual, mesAtual + 1, 0).getDate();
-    
     const referenceDate = isMesCorrente ? hoje : new Date(anoAtual, mesAtual, 15);
+    
+    const diasNoMes = new Date(anoAtual, mesAtual + 1, 0).getDate();
     const timePctBase = isMesCorrente ? Math.min((hoje.getDate() / diasNoMes) * 100, 100) : 100;
 
     container.innerHTML = pinnedBudgets.map(cat => {
+        // 1. Configuração Padrão (Sem Projetor)
         let targetMonth = mesAtual;
         let targetYear = anoAtual;
-        let spent = gastosDoMes[cat] || 0;
-        let isPacingActive = (isMesCorrente);
+        let isPacingActive = isMesCorrente; 
         let timePct = timePctBase;
         let cycleInfoHTML = "";
 
+        // 2. Se a categoria usa o Projetor, alteramos o Mês Alvo (targetMonth)
         if (typeof BudgetProjectorModule !== 'undefined' && typeof BudgetProjectorModule.getProjectorData === 'function') {
-            const projData = BudgetProjectorModule.getProjectorData(cat, referenceDate, transactions);
+            const projData = BudgetProjectorModule.getProjectorData(cat, referenceDate);
             
             if (projData && projData.isTracked) {
-                targetMonth = projData.targetMonth;
+                targetMonth = projData.targetMonth; // Pode ser o mês atual ou o PRÓXIMO mês
                 targetYear = projData.targetYear;
-                spent = projData.spentInCycle;
-                timePct = projData.timePct;
-                isPacingActive = isMesCorrente;
+                timePct = projData.timePct;         // Percentual da fatura
+                isPacingActive = isMesCorrente; 
                 cycleInfoHTML = `<span class="cycle-badge" title="Período: ${projData.cycleLabel}">Ciclo: ${projData.cycleLabel}</span>`;
             }
         }
 
+        // 3. AGORA SIM: Pegamos o dinheiro (R$) do Mês Alvo que definimos!
+        // Se targetMonth mudou, puxamos os gastos dinamicamente via window.getMonthExpenses
+        let spent = 0;
+        if (targetMonth === mesAtual && targetYear === anoAtual) {
+            spent = gastosDoMes[cat] || 0; 
+        } else {
+            // Lente mudou para o mês subsequente! Puxamos os dados contábeis dele.
+            const gastosSubsequentes = window.getMonthExpenses(targetMonth, targetYear) || {};
+            spent = gastosSubsequentes[cat] || 0;
+        }
+
+        // 4. Pegamos a meta (orçamento) configurada para esse mesmo Mês Alvo
         const targetYearMonthStr = `${targetYear}-${String(targetMonth + 1).padStart(2, '0')}`;
         const budget = activeBudgets.find(b => b.category === cat && (b.type === 'mensal' || b.targetMonth === targetYearMonthStr));
         
@@ -726,6 +739,9 @@ function renderPinnedBudgets(gastosDoMes, mesAtual, anoAtual) {
 
         const textStatus = pacingStatus;
 
+        // Label dinâmica para deixar claro para o usuário se ele está vendo este mês ou o próximo
+        const labelMesVisualizado = new Date(targetYear, targetMonth, 1).toLocaleDateString('pt-BR', { month: 'short' }).replace('.','').toUpperCase();
+
         const pacingHTML = isPacingActive ? `
             <div class="pace-indicator" title="Ritmo: Tempo vs Consumo">
                 <div class="pace-track">
@@ -734,8 +750,8 @@ function renderPinnedBudgets(gastosDoMes, mesAtual, anoAtual) {
                 </div>
                 <div class="pace-labels" style="display:flex; justify-content:space-between; align-items:center;">
                     <div style="display:flex; flex-direction:column;">
-                        <span>⏱ ${timePct.toFixed(0)}% do ciclo passado</span>
-                        <span>💸 ${percent.toFixed(0)}% da meta consumida</span>
+                        <span>⏱ ${timePct.toFixed(0)}% da fatura</span>
+                        <span>💸 ${percent.toFixed(0)}% do limite de ${labelMesVisualizado}</span>
                     </div>
                     ${cycleInfoHTML}
                 </div>
@@ -747,7 +763,9 @@ function renderPinnedBudgets(gastosDoMes, mesAtual, anoAtual) {
         return `
             <div class="pinned-card">
                 <div class="pinned-card-header">
-                    <button class="pinned-category-btn" onclick="openCategoryTransactions('${cat.replace(/'/g, "\\'")}', ${targetMonth}, ${targetYear})">${cat}</button>
+                    <button class="pinned-category-btn" onclick="openCategoryTransactions('${cat.replace(/'/g, "\\'")}', ${targetMonth}, ${targetYear})">
+                        ${cat} <small style="opacity: 0.7; font-size: 0.75rem;">(${labelMesVisualizado})</small>
+                    </button>
                     <span>${spent.toLocaleString('pt-BR', {style: 'currency', currency: 'BRL'})} / ${limit > 0 ? limit.toLocaleString('pt-BR', {style: 'currency', currency: 'BRL'}) : 'Sem Meta'}</span>
                 </div>
                 ${pacingHTML}

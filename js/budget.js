@@ -52,27 +52,26 @@ const BudgetModule = (function() {
         let pacingPercent = percent;
         let pacingStatus = percent > 90 ? 'status-danger' : (percent > 70 ? 'status-warning' : 'status-ok');
 
-        // 2. Interceptação do Projetor (Monitoramento do Ciclo do Cartão - Refatorado e Seguro)
+        // 2. Interceptação do Projetor (Monitoramento do Ciclo do Cartão)
         if (typeof BudgetProjectorModule !== 'undefined' && typeof BudgetProjectorModule.getProjectorData === 'function') {
-            const allTxns = JSON.parse(localStorage.getItem('fin_transactions')) || []; 
-            const projData = BudgetProjectorModule.getProjectorData(budget.category, referenceDate, allTxns);
+            const projData = BudgetProjectorModule.getProjectorData(budget.category, referenceDate);
             
             if (projData && projData.isTracked) {
+                // Na tela de orçamentos, o usuário filtra pelo mês no topo da tela.
+                // Só mostramos o status do Projetor se o alvo do projetor for o mesmo mês que o usuário selecionou.
                 const pickerMes = referenceDate.getMonth();
                 
                 if (projData.targetMonth === pickerMes) {
-                    spent = projData.spentInCycle;
-                    percent = budget.amount > 0 ? Math.min((spent / budget.amount) * 100, 100) : (spent > 0 ? 100 : 0);
-                    
-                    pacingPercent = percent; 
+                    // Atualiza o tempo com a barra de ritmo da fatura
                     tempoPercorrido = projData.timePct; 
-                    isPacingActive = isMesCorrente; 
+                    isPacingActive = isMesCorrente;
                     cycleInfoHTML = `<span class="cycle-badge" style="margin-left:8px;" title="Período do ciclo: ${projData.cycleLabel}">(Ciclo: ${projData.cycleLabel})</span>`;
                     
+                    // Ajuste de status: Se gastou mais que o tempo da fatura, fica amarelo.
                     pacingStatus = 'status-ok';
-                    if (pacingPercent > 90) pacingStatus = 'status-danger';
-                    else if (isPacingActive && pacingPercent > (tempoPercorrido + 10)) pacingStatus = 'status-warning';
-                    else if (!isPacingActive && pacingPercent > 70) pacingStatus = 'status-warning';
+                    if (percent > 90) pacingStatus = 'status-danger';
+                    else if (isPacingActive && percent > (tempoPercorrido + 10)) pacingStatus = 'status-warning';
+                    else if (!isPacingActive && percent > 70) pacingStatus = 'status-warning';
                 }
             }
         }

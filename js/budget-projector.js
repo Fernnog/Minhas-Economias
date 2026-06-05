@@ -4,13 +4,13 @@
 const BudgetProjectorModule = (function() {
     const STORAGE_KEY = 'fin_projector_config';
     let _config = JSON.parse(localStorage.getItem(STORAGE_KEY)) || { cycleDay: 1, categories: [] };
-    const MILESTONES = [25, 50, 75, 100];
 
-    // --- Lógica de Data Transversal (Refatorada) ---
+    // --- Lógica de Data Transversal (Gatilho do Mês) ---
     function _getCycleDates(referenceDate, cycleDay) {
         let start, end, targetMonth, targetYear;
         
         if (referenceDate.getDate() >= cycleDay) {
+            // DEPOIS DO CORTE: O ciclo muda a lente para o PRÓXIMO mês civil.
             start = new Date(referenceDate.getFullYear(), referenceDate.getMonth(), cycleDay);
             end = new Date(referenceDate.getFullYear(), referenceDate.getMonth() + 1, cycleDay - 1, 23, 59, 59);
             
@@ -18,6 +18,7 @@ const BudgetProjectorModule = (function() {
             targetMonth = nextMonth.getMonth();
             targetYear = nextMonth.getFullYear();
         } else {
+            // ANTES DO CORTE: O ciclo mantém a lente no MÊS ATUAL.
             start = new Date(referenceDate.getFullYear(), referenceDate.getMonth() - 1, cycleDay);
             end = new Date(referenceDate.getFullYear(), referenceDate.getMonth(), cycleDay - 1, 23, 59, 59);
             
@@ -27,53 +28,29 @@ const BudgetProjectorModule = (function() {
         return { start, end, targetMonth, targetYear };
     }
 
-    // --- Filtro Otimizado em Memória (Sem I/O) ---
-    function _getExpensesInDateRange(start, end, category, txns) {
-        if (!txns || !Array.isArray(txns)) return 0;
-        let total = 0;
-
-        txns.forEach(t => {
-            if (t.type !== 'despesa' || t.category !== category) return;
-            const d = new Date(t.date + 'T00:00:00');
-            
-            if (t.isRecurring) {
-                const projDate1 = new Date(start.getFullYear(), start.getMonth(), d.getDate());
-                const projDate2 = new Date(end.getFullYear(), end.getMonth(), d.getDate());
-                
-                if (projDate1 >= start && projDate1 <= end && (!t.recurrenceEndDate || projDate1 < new Date(t.recurrenceEndDate))) total += t.amount;
-                if (projDate2 > projDate1 && projDate2 >= start && projDate2 <= end && (!t.recurrenceEndDate || projDate2 < new Date(t.recurrenceEndDate))) total += t.amount;
-            } else {
-                if (d >= start && d <= end) total += t.amount;
-            }
-        });
-        return total;
-    }
-
-    // --- Nova API Pública Context-Aware ---
-    function getProjectorData(category, referenceDate, allTxns) {
+    // --- Nova API Pública ---
+    function getProjectorData(category, referenceDate) {
         if (!_config.categories.includes(category)) return { isTracked: false };
 
+        // 1. Descobre para qual mês civil a lente deve apontar
         const { start, end, targetMonth, targetYear } = _getCycleDates(referenceDate, _config.cycleDay);
         
+        // 2. Calcula apenas o percentual de TEMPO da fatura
         const totalDuration = end.getTime() - start.getTime();
         const elapsedDuration = referenceDate.getTime() - start.getTime();
-        
         let timePct = (elapsedDuration / totalDuration) * 100;
-        timePct = Math.max(0, Math.min(timePct, 100));
+        timePct = Math.max(0, Math.min(timePct, 100)); // Trava entre 0 e 100
 
-        const spentInCycle = _getExpensesInDateRange(start, end, category, allTxns);
-
+        // Retorna APENAS os dados de tempo e direção. NÃO calcula dinheiro aqui.
         return {
             isTracked: true,
             timePct,
             cycleLabel: `${String(start.getDate()).padStart(2, '0')}/${String(start.getMonth()+1).padStart(2, '0')} a ${String(end.getDate()).padStart(2, '0')}/${String(end.getMonth()+1).padStart(2, '0')}`,
             targetMonth,
-            targetYear,
-            spentInCycle
+            targetYear
         };
     }
 
-    // --- API Pública ---
     function openConfig() {
         document.getElementById('projector-cycle-day').value = _config.cycleDay;
         const budgets = JSON.parse(localStorage.getItem('fin_budgets')) || [];
@@ -92,7 +69,6 @@ const BudgetProjectorModule = (function() {
 
     function saveConfig() {
         let day = parseInt(document.getElementById('projector-cycle-day').value) || 1;
-        // CLAMP: Impede overflow da API Date em meses curtos (ex: fevereiro). 
         day = Math.max(1, Math.min(day, 28)); 
         const checkboxes = document.querySelectorAll('#projector-cat-list input[type="checkbox"]:checked');
         const cats = Array.from(checkboxes).map(cb => cb.value);
@@ -106,51 +82,11 @@ const BudgetProjectorModule = (function() {
         
         document.getElementById('projector-dialog').close();
         ToastModule.show('Projetor atualizado com sucesso!', 'success');
-        checkAndNotify(); // Teste imediato
+        if (typeof updateAllViews === 'function') updateAllViews(); // Força atualização visual
     }
 
-    function checkAndNotify() {
-        if (!_config.categories || _config.categories.length === 0) return;
-        
-        const today = new Date();
-        const { start, end } = _getCycleDates(today, _config.cycleDay);
-        
-        const totalDuration = end.getTime() - start.getTime();
-        const elapsedDuration = today.getTime() - start.getTime();
-        const timePct = (elapsedDuration / totalDuration) * 100;
-        
-        // Identifica o maior marco de tempo alcançado
-        let activeMilestone = 0;
-        [75, 50, 25].forEach(m => { if (timePct >= m && activeMilestone === 0) activeMilestone = m; });
-        if (activeMilestone === 0) return; // Não atingiu 25% ainda
-
-        const budgets = JSON.parse(localStorage.getItem('fin_budgets')) || [];
-        const cycleKey = start.toISOString().split('T')[0];
-
-        _config.categories.forEach(cat => {
-            const budget = budgets.find(b => b.category === cat);
-            if (!budget) return;
-
-            const spent = _getExpensesInDateRange(start, end, cat);
-            const spentPct = (spent / budget.amount) * 100;
-
-            if (spentPct >= activeMilestone) {
-                const alertKey = `proj_${cycleKey}_${activeMilestone}pct_${cat}`;
-                if (!localStorage.getItem(alertKey)) {
-                    // Prevenir bloqueio da thread UI
-                    requestAnimationFrame(() => {
-                        ToastModule.showMilestone({
-                            icon: '⏱️',
-                            label: `Alerta Projetor: ${cat}`,
-                            msg: `${activeMilestone}% do tempo passou, mas você já gastou ${spentPct.toFixed(0)}% da meta!`,
-                            type: 'warning'
-                        });
-                    });
-                    localStorage.setItem(alertKey, '1');
-                }
-            }
-        });
-    }
+    // Mantido vazio para não quebrar chamadas antigas se existirem
+    function checkAndNotify() {} 
 
     return { openConfig, saveConfig, checkAndNotify, getProjectorData };
 })();
