@@ -6,22 +6,30 @@ const BudgetProjectorModule = (function() {
     let _config = JSON.parse(localStorage.getItem(STORAGE_KEY)) || { cycleDay: 1, categories: [] };
     const MILESTONES = [25, 50, 75, 100];
 
-    // --- Lógica de Data Transversal ---
-    function _getCycleDates(today, cycleDay) {
-        let start, end;
-        if (today.getDate() >= cycleDay) {
-            start = new Date(today.getFullYear(), today.getMonth(), cycleDay);
-            end = new Date(today.getFullYear(), today.getMonth() + 1, cycleDay - 1, 23, 59, 59);
+    // --- Lógica de Data Transversal (Refatorada) ---
+    function _getCycleDates(referenceDate, cycleDay) {
+        let start, end, targetMonth, targetYear;
+        
+        if (referenceDate.getDate() >= cycleDay) {
+            start = new Date(referenceDate.getFullYear(), referenceDate.getMonth(), cycleDay);
+            end = new Date(referenceDate.getFullYear(), referenceDate.getMonth() + 1, cycleDay - 1, 23, 59, 59);
+            
+            let nextMonth = new Date(referenceDate.getFullYear(), referenceDate.getMonth() + 1, 1);
+            targetMonth = nextMonth.getMonth();
+            targetYear = nextMonth.getFullYear();
         } else {
-            start = new Date(today.getFullYear(), today.getMonth() - 1, cycleDay);
-            end = new Date(today.getFullYear(), today.getMonth(), cycleDay - 1, 23, 59, 59);
+            start = new Date(referenceDate.getFullYear(), referenceDate.getMonth() - 1, cycleDay);
+            end = new Date(referenceDate.getFullYear(), referenceDate.getMonth(), cycleDay - 1, 23, 59, 59);
+            
+            targetMonth = referenceDate.getMonth();
+            targetYear = referenceDate.getFullYear();
         }
-        return { start, end };
+        return { start, end, targetMonth, targetYear };
     }
 
-    // --- Filtro Otimizado de Transações ---
-    function _getExpensesInDateRange(start, end, category) {
-        const txns = JSON.parse(localStorage.getItem('fin_transactions')) || [];
+    // --- Filtro Otimizado em Memória (Sem I/O) ---
+    function _getExpensesInDateRange(start, end, category, txns) {
+        if (!txns || !Array.isArray(txns)) return 0;
         let total = 0;
 
         txns.forEach(t => {
@@ -41,27 +49,27 @@ const BudgetProjectorModule = (function() {
         return total;
     }
 
-    function getCategoryCycleStats(category) {
+    // --- Nova API Pública Context-Aware ---
+    function getProjectorData(category, referenceDate, allTxns) {
         if (!_config.categories.includes(category)) return { isTracked: false };
 
-        const today = new Date();
-        const { start, end } = _getCycleDates(today, _config.cycleDay);
+        const { start, end, targetMonth, targetYear } = _getCycleDates(referenceDate, _config.cycleDay);
         
-        // Verifica se a categoria realmente possui um orçamento configurado
-        const budgets = JSON.parse(localStorage.getItem('fin_budgets')) || [];
-        const budget = budgets.find(b => b.category === category);
-        if (!budget) return { isTracked: false };
-
         const totalDuration = end.getTime() - start.getTime();
-        const elapsedDuration = today.getTime() - start.getTime();
+        const elapsedDuration = referenceDate.getTime() - start.getTime();
         
-        // Retorna APENAS os dados temporais do ciclo do cartão (O(1) - Alta performance)
-        const timePct = Math.min((elapsedDuration / totalDuration) * 100, 100);
+        let timePct = (elapsedDuration / totalDuration) * 100;
+        timePct = Math.max(0, Math.min(timePct, 100));
+
+        const spentInCycle = _getExpensesInDateRange(start, end, category, allTxns);
 
         return {
             isTracked: true,
             timePct,
-            cycleLabel: `${String(start.getDate()).padStart(2, '0')}/${String(start.getMonth()+1).padStart(2, '0')} a ${String(end.getDate()).padStart(2, '0')}/${String(end.getMonth()+1).padStart(2, '0')}`
+            cycleLabel: `${String(start.getDate()).padStart(2, '0')}/${String(start.getMonth()+1).padStart(2, '0')} a ${String(end.getDate()).padStart(2, '0')}/${String(end.getMonth()+1).padStart(2, '0')}`,
+            targetMonth,
+            targetYear,
+            spentInCycle
         };
     }
 
@@ -144,5 +152,5 @@ const BudgetProjectorModule = (function() {
         });
     }
 
-    return { openConfig, saveConfig, checkAndNotify, getCategoryCycleStats };
+    return { openConfig, saveConfig, checkAndNotify, getProjectorData };
 })();

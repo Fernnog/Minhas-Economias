@@ -687,66 +687,55 @@ function renderPinnedBudgets(gastosDoMes, mesAtual, anoAtual) {
     const isMesCorrente = (mesAtual === hoje.getMonth() && anoAtual === hoje.getFullYear());
     const diasNoMes = new Date(anoAtual, mesAtual + 1, 0).getDate();
     
-    // Instancia a data de referência contextualmente uma única vez fora do map
-    const referenceDate = isMesCorrente ? new Date() : new Date(anoAtual, mesAtual, 15);
-    const timePctBase = isMesCorrente ? Math.min((hoje.getDate() / diasNoMes) * 100, 100) : null;
-
-    const currentYearMonth = `${anoAtual}-${String(mesAtual + 1).padStart(2, '0')}`;
+    const referenceDate = isMesCorrente ? hoje : new Date(anoAtual, mesAtual, 15);
+    const timePctBase = isMesCorrente ? Math.min((hoje.getDate() / diasNoMes) * 100, 100) : 100;
 
     container.innerHTML = pinnedBudgets.map(cat => {
-        const budget = activeBudgets.find(b => b.category === cat && (b.type === 'mensal' || b.targetMonth === currentYearMonth));
-        
-        // 1. Estado Base (Calendário Civil)
+        let targetMonth = mesAtual;
+        let targetYear = anoAtual;
         let spent = gastosDoMes[cat] || 0;
+        let isPacingActive = (isMesCorrente);
+        let timePct = timePctBase;
+        let cycleInfoHTML = "";
+
+        if (typeof BudgetProjectorModule !== 'undefined' && typeof BudgetProjectorModule.getProjectorData === 'function') {
+            const projData = BudgetProjectorModule.getProjectorData(cat, referenceDate, transactions);
+            
+            if (projData && projData.isTracked) {
+                targetMonth = projData.targetMonth;
+                targetYear = projData.targetYear;
+                spent = projData.spentInCycle;
+                timePct = projData.timePct;
+                isPacingActive = isMesCorrente;
+                cycleInfoHTML = `<span class="cycle-badge" title="Período: ${projData.cycleLabel}">Ciclo: ${projData.cycleLabel}</span>`;
+            }
+        }
+
+        const targetYearMonthStr = `${targetYear}-${String(targetMonth + 1).padStart(2, '0')}`;
+        const budget = activeBudgets.find(b => b.category === cat && (b.type === 'mensal' || b.targetMonth === targetYearMonthStr));
+        
         let limit = budget ? budget.amount : 0;
         let percent = limit > 0 ? Math.min((spent / limit) * 100, 100) : (spent > 0 ? 100 : 0);
         
-        let timePct = timePctBase;
-        let isPacingActive = (limit > 0 && isMesCorrente);
-        let cycleInfoHTML = "";
-
-        let pacingPercent = percent;
         let pacingStatus = 'status-ok';
         if (limit > 0) {
             if (percent > 90) pacingStatus = 'status-danger';
-            else if (percent > 70) pacingStatus = 'status-warning';
+            else if (isPacingActive && percent > (timePct + 10)) pacingStatus = 'status-warning';
+            else if (!isPacingActive && percent > 70) pacingStatus = 'status-warning';
         }
 
-        // 2. Interceptação do Projetor (Ciclo de Fatura do Cartão)
-        if (typeof BudgetProjectorModule !== 'undefined') {
-            // CORREÇÃO: Removido o argumento 'referenceDate' fantasma
-            const cycleStats = BudgetProjectorModule.getCategoryCycleStats(cat);
-            if (cycleStats.isTracked) {
-                // CORREÇÃO: O percentual financeiro herda a fonte única da verdade (mês civil)
-                pacingPercent = percent; 
-                timePct = cycleStats.timePct; // Ritmo temporal
-                isPacingActive = true;
-                cycleInfoHTML = `<span class="cycle-badge" title="Período do ciclo: ${cycleStats.cycleLabel}">Ciclo: ${cycleStats.cycleLabel}</span>`;
-                
-                // Determina o status da barra de preenchimento comparando Consumo (Financeiro) vs Tempo (Projetor)
-                pacingStatus = 'status-ok';
-                if (pacingPercent > 90) pacingStatus = 'status-danger';
-                else if (pacingPercent > (timePct + 10) || pacingPercent > 70) pacingStatus = 'status-warning';
-            }
-        }
-        
-        // Determina o status de cor da borda de texto com base no calendário civil
-        let textStatus = 'status-ok';
-        if (limit > 0) {
-            if (percent > 90) textStatus = 'status-danger';
-            else if (percent > 70) textStatus = 'status-warning';
-        }
+        const textStatus = pacingStatus;
 
         const pacingHTML = isPacingActive ? `
             <div class="pace-indicator" title="Ritmo: Tempo vs Consumo">
                 <div class="pace-track">
                     <div class="pace-time-bar" style="width: ${timePct}%;"></div>
-                    <div class="pace-spend-bar ${pacingStatus}" style="width: ${pacingPercent}%;"></div>
+                    <div class="pace-spend-bar ${pacingStatus}" style="width: ${percent}%;"></div>
                 </div>
                 <div class="pace-labels" style="display:flex; justify-content:space-between; align-items:center;">
                     <div style="display:flex; flex-direction:column;">
-                        <span>⏱ ${timePct.toFixed(0)}% do tempo da fatura</span>
-                        <span>💸 ${pacingPercent.toFixed(0)}% consumido</span>
+                        <span>⏱ ${timePct.toFixed(0)}% do ciclo passado</span>
+                        <span>💸 ${percent.toFixed(0)}% da meta consumida</span>
                     </div>
                     ${cycleInfoHTML}
                 </div>
@@ -758,7 +747,7 @@ function renderPinnedBudgets(gastosDoMes, mesAtual, anoAtual) {
         return `
             <div class="pinned-card">
                 <div class="pinned-card-header">
-                    <button class="pinned-category-btn" onclick="openCategoryTransactions('${cat.replace(/'/g, "\\'")}', ${mesAtual}, ${anoAtual})">${cat}</button>
+                    <button class="pinned-category-btn" onclick="openCategoryTransactions('${cat.replace(/'/g, "\\'")}', ${targetMonth}, ${targetYear})">${cat}</button>
                     <span>${spent.toLocaleString('pt-BR', {style: 'currency', currency: 'BRL'})} / ${limit > 0 ? limit.toLocaleString('pt-BR', {style: 'currency', currency: 'BRL'}) : 'Sem Meta'}</span>
                 </div>
                 ${pacingHTML}

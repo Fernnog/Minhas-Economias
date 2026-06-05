@@ -52,21 +52,27 @@ const BudgetModule = (function() {
         let pacingPercent = percent;
         let pacingStatus = percent > 90 ? 'status-danger' : (percent > 70 ? 'status-warning' : 'status-ok');
 
-        // 2. Interceptação do Projetor (Monitoramento do Ciclo do Cartão)
-        if (typeof BudgetProjectorModule !== 'undefined') {
-            // CORREÇÃO: Removido o argumento 'referenceDate' fantasma
-            const cycleStats = BudgetProjectorModule.getCategoryCycleStats(budget.category);
-            if (cycleStats.isTracked) {
-                // CORREÇÃO: O percentual financeiro herda a fonte única da verdade
-                pacingPercent = percent; 
-                tempoPercorrido = cycleStats.timePct; 
-                isPacingActive = true;
-                cycleInfoHTML = `<span class="cycle-badge" style="margin-left:8px;" title="Período do ciclo: ${cycleStats.cycleLabel}">(Ciclo: ${cycleStats.cycleLabel})</span>`;
+        // 2. Interceptação do Projetor (Monitoramento do Ciclo do Cartão - Refatorado e Seguro)
+        if (typeof BudgetProjectorModule !== 'undefined' && typeof BudgetProjectorModule.getProjectorData === 'function') {
+            const allTxns = JSON.parse(localStorage.getItem('fin_transactions')) || []; 
+            const projData = BudgetProjectorModule.getProjectorData(budget.category, referenceDate, allTxns);
+            
+            if (projData && projData.isTracked) {
+                const pickerMes = referenceDate.getMonth();
                 
-                // O status de aviso da barra responde ao cruzamento do consumo vs tempo
-                pacingStatus = pacingPercent > 90 ? 'status-danger' : (pacingPercent > 70 ? 'status-warning' : 'status-ok');
-                if (pacingPercent > (tempoPercorrido + 10) && pacingPercent <= 90) {
-                    pacingStatus = 'status-warning';
+                if (projData.targetMonth === pickerMes) {
+                    spent = projData.spentInCycle;
+                    percent = budget.amount > 0 ? Math.min((spent / budget.amount) * 100, 100) : (spent > 0 ? 100 : 0);
+                    
+                    pacingPercent = percent; 
+                    tempoPercorrido = projData.timePct; 
+                    isPacingActive = isMesCorrente; 
+                    cycleInfoHTML = `<span class="cycle-badge" style="margin-left:8px;" title="Período do ciclo: ${projData.cycleLabel}">(Ciclo: ${projData.cycleLabel})</span>`;
+                    
+                    pacingStatus = 'status-ok';
+                    if (pacingPercent > 90) pacingStatus = 'status-danger';
+                    else if (isPacingActive && pacingPercent > (tempoPercorrido + 10)) pacingStatus = 'status-warning';
+                    else if (!isPacingActive && pacingPercent > 70) pacingStatus = 'status-warning';
                 }
             }
         }
