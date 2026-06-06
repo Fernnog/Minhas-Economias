@@ -65,6 +65,75 @@ const ExtractModule = (function() {
         btnTop.addEventListener('click', () => window.scrollTo({ top: 0, behavior: 'smooth' }));
         btnBottom.addEventListener('click', () => window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'smooth' }));
 
+        // Aplica as cores baseadas no config global
+        const btnPassai = document.getElementById('btn-scroll-passai');
+        const btnCef = document.getElementById('btn-scroll-cef');
+        
+        if (btnPassai && typeof window.PAYMENT_CONFIG !== 'undefined' && window.PAYMENT_CONFIG['cartao1']) {
+            btnPassai.style.setProperty('--btn-color', window.PAYMENT_CONFIG['cartao1'].color);
+            btnPassai.style.borderColor = window.PAYMENT_CONFIG['cartao1'].color + '40'; // 40 = opacidade hex
+        }
+        if (btnCef && typeof window.PAYMENT_CONFIG !== 'undefined' && window.PAYMENT_CONFIG['cartao2']) {
+            btnCef.style.setProperty('--btn-color', window.PAYMENT_CONFIG['cartao2'].color);
+            btnCef.style.borderColor = window.PAYMENT_CONFIG['cartao2'].color + '40';
+        }
+
+        // Algoritmo de Busca e Rolagem
+        const scrollToInvoiceCycle = (targetDay, direction) => {
+            const headers = Array.from(document.querySelectorAll('.day-group-header'));
+            if (headers.length === 0) return;
+
+            // Fallback: Encontra o dia exato ou o imediatamente anterior disponível no DOM
+            const availableDays = headers.map(h => parseInt(h.dataset.day));
+            // Filtra dias <= ao alvo e pega o maior deles (mais próximo)
+            const validDays = availableDays.filter(d => d <= targetDay);
+            
+            if (validDays.length === 0) {
+                if (typeof showToast !== 'undefined') showToast(`Nenhuma transação anterior ao dia ${targetDay} encontrada neste mês.`, 'warning');
+                return;
+            }
+
+            const closestDay = Math.max(...validDays);
+            const targetHeader = headers.find(h => parseInt(h.dataset.day) === closestDay);
+            
+            let targetRow = null;
+
+            if (direction === 'top-down') {
+                // Foco na PRIMEIRA transação após o cabeçalho
+                targetRow = targetHeader.nextElementSibling;
+                if (!targetRow || !targetRow.classList.contains('extract-row')) targetRow = targetHeader;
+            } else if (direction === 'bottom-up') {
+                // Foco na ÚLTIMA transação do dia antes do saldo diário
+                let current = targetHeader.nextElementSibling;
+                while (current && current.classList.contains('extract-row')) {
+                    targetRow = current; // Atualiza até o loop quebrar
+                    current = current.nextElementSibling;
+                }
+                if (!targetRow) targetRow = targetHeader;
+            }
+
+            // Centraliza o alvo na tela, descontando o header fixo do app (estimado 120px)
+            const yOffset = -120; 
+            const y = targetRow.getBoundingClientRect().top + window.scrollY + yOffset;
+            
+            window.scrollTo({ top: y, behavior: 'smooth' });
+            
+            // UX Feedback
+            const msg = closestDay === targetDay 
+                ? `Ciclo localizado (Dia ${targetDay}).` 
+                : `Dia ${targetDay} sem compras. Retrocedendo para o dia ${closestDay}.`;
+            if (typeof showToast !== 'undefined') showToast(msg);
+            
+            // Destaque visual temporário na linha (Aderente à identidade institucional)
+            targetRow.style.transition = 'background-color 0.5s';
+            targetRow.style.backgroundColor = 'rgba(37, 99, 235, 0.15)'; 
+            setTimeout(() => targetRow.style.backgroundColor = '', 1500);
+        };
+
+        // Event Listeners
+        if (btnPassai) btnPassai.addEventListener('click', () => scrollToInvoiceCycle(24, 'top-down'));
+        if (btnCef) btnCef.addEventListener('click', () => scrollToInvoiceCycle(25, 'bottom-up'));
+
         let isScrolling = false;
 
         // Ouve o scroll do navegador com otimização (requestAnimationFrame)
@@ -193,7 +262,9 @@ const ExtractModule = (function() {
             const group = groups[date];
             const dateLabel = new Date(date + 'T00:00:00').toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: 'short' }).toUpperCase();
 
-            list.innerHTML += `<tr class="day-group-header"><td colspan="3">${dateLabel}</td></tr>`;
+            // Extrai o dia para o data-attribute ignorando fuso horário
+            const diaStr = date.split('-')[2];
+            list.innerHTML += `<tr class="day-group-header" data-day="${diaStr}"><td colspan="3">${dateLabel}</td></tr>`;
 
             group.items.forEach(t => {
                 const isVirtual = t.id.includes('_proj');
