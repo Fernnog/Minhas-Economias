@@ -1618,6 +1618,40 @@ button.btn-voltar.btn-dark-gold {
     pointer-events: none; /* Permite clicar através do container invisível */
 }
 
+/* --- GRUPO DE ATALHOS DE FATURA --- */
+.invoice-shortcuts-group {
+    display: flex;
+    gap: 6px;
+    background: var(--card);
+    padding: 4px;
+    border-radius: 24px;
+    border: 1px solid var(--border);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+    pointer-events: auto; /* Reativa clique no sub-container */
+}
+
+.floating-invoice-btn {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    border: 1.5px solid transparent; /* Cor injetada via JS */
+    background: transparent;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    /* Variável fallback caso o JS falhe (Cor institucional neutra) */
+    color: var(--btn-color, var(--text-light)); 
+}
+
+.floating-invoice-btn:hover {
+    background: var(--btn-color, #2563EB);
+    color: #fff;
+    border-color: var(--btn-color, #2563EB);
+    transform: scale(1.05);
+}
+
 .floating-scroll-btn {
     background-color: var(--card);
     color: var(--primary);
