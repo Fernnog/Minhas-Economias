@@ -65,74 +65,55 @@ const ExtractModule = (function() {
         btnTop.addEventListener('click', () => window.scrollTo({ top: 0, behavior: 'smooth' }));
         btnBottom.addEventListener('click', () => window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'smooth' }));
 
-        // Aplica as cores baseadas no config global
-        const btnPassai = document.getElementById('btn-scroll-passai');
-        const btnCef = document.getElementById('btn-scroll-cef');
-        
-        if (btnPassai && typeof window.PAYMENT_CONFIG !== 'undefined' && window.PAYMENT_CONFIG['cartao1']) {
-            btnPassai.style.setProperty('--btn-color', window.PAYMENT_CONFIG['cartao1'].color);
-            btnPassai.style.borderColor = window.PAYMENT_CONFIG['cartao1'].color + '40'; // 40 = opacidade hex
-        }
-        if (btnCef && typeof window.PAYMENT_CONFIG !== 'undefined' && window.PAYMENT_CONFIG['cartao2']) {
-            btnCef.style.setProperty('--btn-color', window.PAYMENT_CONFIG['cartao2'].color);
-            btnCef.style.borderColor = window.PAYMENT_CONFIG['cartao2'].color + '40';
-        }
-
-        // Algoritmo de Busca e Rolagem
-        const scrollToInvoiceCycle = (targetDay, direction) => {
+        const scrollToInvoiceCycle = (targetDay) => {
             const headers = Array.from(document.querySelectorAll('.day-group-header'));
             if (headers.length === 0) return;
 
-            // Fallback: Encontra o dia exato ou o imediatamente anterior disponível no DOM
+            // 1. Encontra o dia exato ou o dia anterior mais próximo
             const availableDays = headers.map(h => parseInt(h.dataset.day));
-            // Filtra dias <= ao alvo e pega o maior deles (mais próximo)
             const validDays = availableDays.filter(d => d <= targetDay);
             
             if (validDays.length === 0) {
-                if (typeof showToast !== 'undefined') showToast(`Nenhuma transação anterior ao dia ${targetDay} encontrada neste mês.`, 'warning');
+                showToast(`Nenhuma transação até o dia ${targetDay} encontrada.`, 'warning');
                 return;
             }
 
             const closestDay = Math.max(...validDays);
             const targetHeader = headers.find(h => parseInt(h.dataset.day) === closestDay);
             
+            // 2. Foco na PRIMEIRA compra cronológica (a ÚLTIMA linha antes de fechar o dia)
+            let current = targetHeader.nextElementSibling;
             let targetRow = null;
 
-            if (direction === 'top-down') {
-                // Foco na PRIMEIRA transação após o cabeçalho
-                targetRow = targetHeader.nextElementSibling;
-                if (!targetRow || !targetRow.classList.contains('extract-row')) targetRow = targetHeader;
-            } else if (direction === 'bottom-up') {
-                // Foco na ÚLTIMA transação do dia antes do saldo diário
-                let current = targetHeader.nextElementSibling;
-                while (current && current.classList.contains('extract-row')) {
-                    targetRow = current; // Atualiza até o loop quebrar
-                    current = current.nextElementSibling;
-                }
-                if (!targetRow) targetRow = targetHeader;
+            while (current && current.classList.contains('extract-row')) {
+                targetRow = current; // Salva a linha e avança
+                current = current.nextElementSibling;
             }
 
-            // Centraliza o alvo na tela, descontando o header fixo do app (estimado 120px)
-            const yOffset = -120; 
-            const y = targetRow.getBoundingClientRect().top + window.scrollY + yOffset;
+            // Fallback de segurança (se não achar linhas, vai para o título do dia)
+            if (!targetRow) targetRow = targetHeader;
+
+            // 3. Centraliza a compra escolhida exatamente no meio da tela
+            targetRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
             
-            window.scrollTo({ top: y, behavior: 'smooth' });
-            
-            // UX Feedback
+            // UX Feedback Visual
             const msg = closestDay === targetDay 
-                ? `Ciclo localizado (Dia ${targetDay}).` 
-                : `Dia ${targetDay} sem compras. Retrocedendo para o dia ${closestDay}.`;
-            if (typeof showToast !== 'undefined') showToast(msg);
+                ? `Primeira compra do ciclo localizada (Dia ${targetDay}).` 
+                : `Dia ${targetDay} vazio. Retrocedendo para o dia ${closestDay}.`;
+            showToast(msg);
             
-            // Destaque visual temporário na linha (Aderente à identidade institucional)
+            // Pisca a linha em amarelo para guiar o olhar
             targetRow.style.transition = 'background-color 0.5s';
-            targetRow.style.backgroundColor = 'rgba(37, 99, 235, 0.15)'; 
+            targetRow.style.backgroundColor = 'rgba(201, 168, 76, 0.25)';
             setTimeout(() => targetRow.style.backgroundColor = '', 1500);
         };
 
-        // Event Listeners
-        if (btnPassai) btnPassai.addEventListener('click', () => scrollToInvoiceCycle(24, 'top-down'));
-        if (btnCef) btnCef.addEventListener('click', () => scrollToInvoiceCycle(25, 'bottom-up'));
+        const btnPassai = document.getElementById('btn-scroll-passai');
+        const btnCef = document.getElementById('btn-scroll-cef');
+        
+        // Agora ambos executam a mesma regra de "fundo de funil" (última linha do dia)
+        if (btnPassai) btnPassai.addEventListener('click', () => scrollToInvoiceCycle(24));
+        if (btnCef) btnCef.addEventListener('click', () => scrollToInvoiceCycle(25));
 
         let isScrolling = false;
 
