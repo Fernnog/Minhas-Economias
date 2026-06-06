@@ -1618,38 +1618,25 @@ button.btn-voltar.btn-dark-gold {
     pointer-events: none; /* Permite clicar através do container invisível */
 }
 
-/* --- GRUPO DE ATALHOS DE FATURA --- */
-.invoice-shortcuts-group {
-    display: flex;
-    gap: 6px;
-    background: var(--card);
-    padding: 4px;
-    border-radius: 24px;
-    border: 1px solid var(--border);
-    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
-    pointer-events: auto; /* Reativa clique no sub-container */
+/* --- CORES DOS ATALHOS DE FATURA NO EXTRATO --- */
+#btn-scroll-passai {
+    color: #059669; /* Verde Passaí */
+    border-color: rgba(5, 150, 105, 0.3);
 }
-
-.floating-invoice-btn {
-    width: 36px;
-    height: 36px;
-    border-radius: 50%;
-    border: 1.5px solid transparent; /* Cor injetada via JS */
-    background: transparent;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    /* Variável fallback caso o JS falhe (Cor institucional neutra) */
-    color: var(--btn-color, var(--text-light)); 
-}
-
-.floating-invoice-btn:hover {
-    background: var(--btn-color, #2563EB);
+#btn-scroll-passai:hover {
+    background-color: #059669;
     color: #fff;
-    border-color: var(--btn-color, #2563EB);
-    transform: scale(1.05);
+    box-shadow: 0 6px 16px rgba(5, 150, 105, 0.3);
+}
+
+#btn-scroll-cef {
+    color: #7C3AED; /* Roxo CEF */
+    border-color: rgba(124, 58, 237, 0.3);
+}
+#btn-scroll-cef:hover {
+    background-color: #7C3AED;
+    color: #fff;
+    box-shadow: 0 6px 16px rgba(124, 58, 237, 0.3);
 }
 
 .floating-scroll-btn {
