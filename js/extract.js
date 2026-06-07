@@ -3,9 +3,11 @@ const ExtractModule = (function() {
     let currentMonth = new Date().getMonth();
     let currentYear = new Date().getFullYear();
 
-    // === ESTADO: CONFERÊNCIA & FILTRO ===
+    // === ESTADO: CONFERÊNCIA, FILTRO E BUSCA ===
     // 0 = todos | 1 = somente conferidos | 2 = somente pendentes
     let filterMode = 0;
+    let searchQuery = ''; 
+    let searchDebounce = null; // Controle anti-travamento para digitação rápida
     let confirmedItems = JSON.parse(localStorage.getItem('fin_confirmed_items') || '{}');
 
     function _saveConfirmed() {
@@ -167,7 +169,40 @@ const ExtractModule = (function() {
                 const [y, m] = e.target.value.split('-');
                 currentMonth = parseInt(m) - 1;
                 currentYear = parseInt(y);
+                
+                // CORREÇÃO CRÍTICA: Reset do estado da busca ao mudar o mês
+                searchQuery = '';
+                const searchInput = document.getElementById('extract-search-input');
+                const searchClear = document.getElementById('extract-search-clear');
+                if (searchInput) searchInput.value = '';
+                if (searchClear) searchClear.classList.add('hidden');
+                
                 render();
+            });
+        }
+
+        // Listeners da Busca Investigativa com Debounce (Performance)
+        const searchInput = document.getElementById('extract-search-input');
+        const searchClear = document.getElementById('extract-search-clear');
+        
+        if (searchInput) {
+            searchInput.addEventListener('input', (e) => {
+                clearTimeout(searchDebounce);
+                searchDebounce = setTimeout(() => {
+                    searchQuery = e.target.value.trim().toLowerCase();
+                    if (searchClear) searchClear.classList.toggle('hidden', searchQuery === '');
+                    render();
+                }, 150); // Aguarda 150ms de pausa na digitação antes de renderizar
+            });
+        }
+
+        if (searchClear) {
+            searchClear.addEventListener('click', () => {
+                searchInput.value = '';
+                searchQuery = '';
+                searchClear.classList.add('hidden');
+                render();
+                searchInput.focus();
             });
         }
 
@@ -210,12 +245,57 @@ const ExtractModule = (function() {
         });
 
         // --- Aplica filtro de conferência ---
-        const filtered = filterMode === 0
+        let filtered = filterMode === 0
             ? allMonth
             : allMonth.filter(t => {
                 const isConf = !!confirmedItems[_confirmKey(t.id, t.date)];
                 return filterMode === 1 ? isConf : !isConf;
             });
+
+        // --- Aplica Busca Investigativa (Dual: Texto e Valor) ---
+        let searchTotalSum = 0;
+        let searchCount = 0;
+
+        if (searchQuery) {
+            filtered = filtered.filter(t => {
+                const descMatch = t.desc.toLowerCase().includes(searchQuery);
+                const catMatch = t.category.toLowerCase().includes(searchQuery);
+                
+                const valCents = t.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+                const valPlain = t.amount.toString();
+                const valMatch = valCents.includes(searchQuery) || valPlain.includes(searchQuery);
+
+                if (descMatch || catMatch || valMatch) {
+                    searchTotalSum += (t.type === 'receita' ? t.amount : -t.amount);
+                    searchCount++;
+                    return true;
+                }
+                return false;
+            });
+        }
+
+        // --- Gestão do Mini-Relatório Dinâmico UI ---
+        const reportContainer = document.getElementById('extract-search-report');
+        if (searchQuery) {
+            const formattedTotal = Math.abs(searchTotalSum).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+            const colorClass = searchTotalSum >= 0 ? 'var(--success)' : 'var(--danger)';
+            const prefix = searchTotalSum < 0 ? '-' : '';
+            
+            if (reportContainer) {
+                reportContainer.innerHTML = `
+                    <div class="search-mini-report">
+                        <span>🔍 <strong>${searchCount}</strong> resultado(s) para "${searchQuery}"</span>
+                        <span style="color: ${colorClass};">${prefix}${formattedTotal}</span>
+                    </div>
+                `;
+                reportContainer.classList.remove('hidden');
+            }
+        } else {
+            if (reportContainer) {
+                reportContainer.classList.add('hidden');
+                reportContainer.innerHTML = ''; // Limpeza de memória
+            }
+        }
 
         // --- Saldo acumulado até o início do mês ---
         let balance = transactions.reduce((acc, t) => {
@@ -292,10 +372,12 @@ const ExtractModule = (function() {
                     </tr>`;
             });
 
-            list.innerHTML += `
-                <tr class="day-balance-row">
-                    <td colspan="3">Saldo do dia: <span class="${group.dayBalance < 0 ? 'despesa' : ''}">${group.dayBalance.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span></td>
-                </tr>`;
+            if (!searchQuery) {
+                list.innerHTML += `
+                    <tr class="day-balance-row">
+                        <td colspan="3">Saldo do dia: <span class="${group.dayBalance < 0 ? 'despesa' : ''}">${group.dayBalance.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span></td>
+                    </tr>`;
+            }
         });
 
         // NOVO: Força um evento de scroll falso para recalcular botões após remontar a lista
