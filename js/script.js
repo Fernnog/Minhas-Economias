@@ -1,5 +1,25 @@
 // === STATE MANAGEMENT ===
 let transactions = JSON.parse(localStorage.getItem('fin_transactions')) || [];
+
+/**
+ * Retorna uma string segura contendo o dia 25 do mês vigente (ou do seguinte se hoje > 25).
+ * Previne inconsistências de data devido a processamentos de fuso horário local.
+ */
+function getSmartDefaultDateString() {
+    const today = new Date();
+    let year = today.getFullYear();
+    let month = today.getMonth() + 1;
+    const day = today.getDate();
+
+    if (day > 25) {
+        month++;
+        if (month > 12) {
+            month = 1;
+            year++;
+        }
+    }
+    return `${year}-${String(month).padStart(2, '0')}-25`;
+}
 let categories = JSON.parse(localStorage.getItem('fin_categories')) || ['Alimentação', 'Moradia', 'Transporte', 'Salário', 'Lazer'];
 let pinnedBudgets = JSON.parse(localStorage.getItem('fin_pinned_budgets')) || [];
 
@@ -222,7 +242,7 @@ function init() {
     if (headerDate) headerDate.innerText = new Date().toLocaleDateString('pt-BR');
     
     const transDate = document.getElementById('trans-date');
-    if (transDate) transDate.valueAsDate = new Date();
+    if (transDate) transDate.value = getSmartDefaultDateString();
     
     populateCategoryGroups();
     
@@ -272,6 +292,10 @@ function init() {
 window.showDashboard = function() {
     managementView.classList.add('hidden');
     dashboardView.classList.remove('hidden');
+    
+    const dock = document.getElementById('global-dock');
+    if (dock) dock.classList.remove('dock-collapsed');
+    
     updateAllViews();
 };
 
@@ -286,18 +310,14 @@ function fastNavigateToDashboard() {
     if (mgmtView) mgmtView.classList.add('hidden');
     if (dashView) {
         dashView.classList.remove('hidden');
-        
-        // Reset da animação para garantir que ela dispare a cada clique
         dashView.classList.remove('fade-in-fast');
-        
-        // CUIDADO ARQUITETURAL: A linha abaixo força o browser a calcular o layout.
-        // É essencial para que o DOM perceba a remoção e re-adição da classe no mesmo frame.
         void dashView.offsetWidth; 
-        
         dashView.classList.add('fade-in-fast');
     }
     
-    // Restaura o scroll para o topo de forma instantânea, sem conflitar com o fade-in
+    const dock = document.getElementById('global-dock');
+    if (dock) dock.classList.remove('dock-collapsed');
+    
     window.scrollTo({ top: 0, behavior: 'instant' });
 }
 
@@ -311,6 +331,16 @@ window.showView = function(targetView) {
     });
     const targetEl = document.getElementById(`view-${targetView}`);
     if (targetEl) targetEl.classList.remove('hidden');
+    
+    const dock = document.getElementById('global-dock');
+    if (dock) {
+        if (targetView === 'form') {
+            dock.classList.add('dock-collapsed');
+        } else {
+            dock.classList.remove('dock-collapsed');
+        }
+    }
+    
     if (targetView === 'budget' && typeof BudgetModule !== 'undefined') BudgetModule.render();
     if (targetView === 'charts') updateDashboardData(); 
 };
@@ -961,7 +991,7 @@ form.addEventListener('submit', function(e) {
     document.getElementById('trans-id').value = '';
     document.getElementById('btn-save').innerText = 'Salvar Lançamento';
     const transDateInput = document.getElementById('trans-date');
-    if (transDateInput) transDateInput.valueAsDate = new Date();
+    if (transDateInput) transDateInput.value = getSmartDefaultDateString();
 
     // FASE 3: FEEDBACK E NAVEGAÇÃO RÁPIDA (UX Instântanea)
     showToast(id ? 'Lançamento atualizado com sucesso!' : 'Novo lançamento salvo!');
