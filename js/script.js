@@ -322,16 +322,32 @@ function fastNavigateToDashboard() {
 }
 
 window.showView = function(targetView) {
+    const targetEl = document.getElementById(`view-${targetView}`);
+    
+    // 1. Padrão Early Return (Fail-Fast): Valida existência antes de alterar UI
+    if (!targetEl) {
+        console.error(`[Router] Tela solicitada não existe no DOM: view-${targetView}`);
+        if (typeof showToast === 'function') {
+            showToast('Erro: A tela solicitada está indisponível no momento.');
+        }
+        return; // Aborta a operação, mantendo a tela atual intacta
+    }
+
+    // 2. Transição Segura de Estado
     dashboardView.classList.add('hidden');
     managementView.classList.remove('hidden');
+    
+    // Oculta as demais sub-telas
     const subViews = ['view-form', 'view-extract', 'view-budget', 'view-charts'];
     subViews.forEach(viewId => {
         const viewEl = document.getElementById(viewId);
         if (viewEl) viewEl.classList.add('hidden');
     });
-    const targetEl = document.getElementById(`view-${targetView}`);
-    if (targetEl) targetEl.classList.remove('hidden');
     
+    // Exibe a tela alvo
+    targetEl.classList.remove('hidden');
+    
+    // 3. Gerenciamento do Dock Global
     const dock = document.getElementById('global-dock');
     if (dock) {
         if (targetView === 'form') {
@@ -341,6 +357,7 @@ window.showView = function(targetView) {
         }
     }
     
+    // 4. Delegação de Renderização Baseada na Rota
     if (targetView === 'budget' && typeof BudgetModule !== 'undefined') BudgetModule.render();
     if (targetView === 'charts') updateDashboardData(); 
 };
