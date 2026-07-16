@@ -380,6 +380,75 @@
                 </section>
 
                 <section id="view-charts" class="hidden">
+                    <!-- INÍCIO DO HUB DE RELATÓRIOS (Central de Análise) -->
+                    <div class="report-cards-grid" style="margin-bottom: 2rem;">
+                        
+                        <button class="report-launcher-card" onclick="ReportsModule.openBudgetDeviation()">
+                            <div class="report-card-icon">
+                                <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
+                            </div>
+                            <h4 class="report-card-title">Desvio Orçamentário</h4>
+                            <p class="report-card-desc">Compare o previsto vs. realizado em todos orçamentos.</p>
+                            <span class="report-card-cta">Ver Análise →</span>
+                        </button>
+
+                        <button class="report-launcher-card" onclick="ReportsModule.openFutureCommitment()">
+                            <div class="report-card-icon">
+                                <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                            </div>
+                            <h4 class="report-card-title">Radar de Comprometimento</h4>
+                            <p class="report-card-desc">Projeção de gastos fixos para os próximos 6 meses.</p>
+                            <span class="report-card-cta">Ver Radar →</span>
+                        </button>
+
+                        <button class="report-launcher-card" onclick="ReportsModule.openIncomeRigidity()">
+                            <div class="report-card-icon">
+                                <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.21 15.89A10 10 0 1 1 8 2.83"></path><path d="M22 12A10 10 0 0 0 12 2v10z"></path></svg>
+                            </div>
+                            <h4 class="report-card-title">Mapa de Engessamento</h4>
+                            <p class="report-card-desc">Descubra qual % da sua renda já está bloqueada.</p>
+                            <span class="report-card-cta">Ver Índice →</span>
+                        </button>
+
+                        <button class="report-launcher-card" onclick="ReportsModule.openPaymentMethodReport()">
+                            <div class="report-card-icon">
+                                <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect><line x1="1" y1="10" x2="23" y2="10"></line></svg>
+                            </div>
+                            <h4 class="report-card-title">Meios de Pagamento</h4>
+                            <p class="report-card-desc">Análise de gastos dividida por cartões e contas.</p>
+                            <span class="report-card-cta">Ver Divisão →</span>
+                        </button>
+
+                        <button class="report-launcher-card report-launcher-imprevistos" onclick="ReportsModule.openImprevistosAlert()">
+                            <div class="report-card-icon">
+                                <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 14.76V3.5a2.5 2.5 0 0 0-5 0v11.26a4.5 4.5 0 1 0 5 0z"></path></svg>
+                            </div>
+                            <h4 class="report-card-title">Termômetro de Imprevistos</h4>
+                            <p class="report-card-desc">Monitore gastos emergenciais e proteja sua reserva.</p>
+                            <span class="report-card-cta">Medir Risco →</span>
+                        </button>
+                        
+                        <button class="report-launcher-card report-launcher-projector" onclick="BudgetProjectorModule.openConfig()">
+                            <div class="report-card-icon">
+                                <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+                            </div>
+                            <h4 class="report-card-title">Projetor de Ciclos</h4>
+                            <p class="report-card-desc">Alinhe orçamentos com a data de corte do cartão.</p>
+                            <span class="report-card-cta">Configurar →</span>
+                        </button>
+
+                        <button class="report-launcher-card report-launcher-ai" onclick="document.getElementById('export-ai-dialog').showModal()">
+                            <div class="report-card-icon">
+                                <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="7.5 4.21 12 6.81 16.5 4.21"></polyline><polyline points="7.5 19.79 7.5 14.6 3 12"></polyline><polyline points="21 12 16.5 14.6 16.5 19.79"></polyline><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
+                            </div>
+                            <h4 class="report-card-title">Exportar para IA</h4>
+                            <p class="report-card-desc">Gere um prompt detalhado para analisar no ChatGPT.</p>
+                            <span class="report-card-cta">Gerar Dados →</span>
+                        </button>
+
+                    </div>
+                    <!-- FIM DO HUB DE RELATÓRIOS -->
+
                     <div class="card chart-card">
                         <div class="chart-card-header">
                             <div class="chart-card-title-row">
