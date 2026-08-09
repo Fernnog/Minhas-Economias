@@ -420,26 +420,59 @@ function updateDashboardData() {
 
     let saldoAtualTotal = 0;
     let saldoFimMesTotal = 0;
-    const gastosPorCategoria = getMonthExpenses(mesAtual, anoAtual);
-    const todasTransacoes = [];
-
+    const gastosPorCategoria = getMonthExpenses(mesAtual, anoAtual); // PRESERVADO PARA NÃO QUEBRAR OS GRÁFICOS
+    
+    // NOVO CÁLCULO CUMULATIVO BLINDADO
     transactions.forEach(t => {
-        if (window.isTransactionActiveInMonth(t, anoAtual, mesAtual)) {
-            const isOriginMonth = t.date.slice(0, 7) === `${anoAtual}-${String(mesAtual + 1).padStart(2, '0')}`;
-            const dataProjetada = isOriginMonth ? t.date : `${anoAtual}-${String(mesAtual + 1).padStart(2, '0')}-${t.date.slice(8, 10)}`;
-            
-            todasTransacoes.push({ ...t, date: dataProjetada });
-        }
-    });
+        const d = new Date(t.date + 'T00:00:00');
+        const tMonth = d.getMonth();
+        const tYear = d.getFullYear();
+        const amountSigned = t.type === 'receita' ? t.amount : -t.amount;
+        
+        // 1. Processa a Transação Original (ou compras únicas/parceladas)
+        const originMonthStr = t.date.slice(0, 7);
+        const isSkippedAtOrigin = t.skippedDates && t.skippedDates.includes(originMonthStr);
 
-    todasTransacoes.forEach(trans => {
-        const dataTrans = new Date(trans.date + 'T00:00:00');
-        const isMesmoMes = dataTrans.getMonth() === mesAtual && dataTrans.getFullYear() === anoAtual;
-        if (isMesCorrente && dataTrans <= hoje) {
-            trans.type === 'receita' ? saldoAtualTotal += trans.amount : saldoAtualTotal -= trans.amount;
+        if (!isSkippedAtOrigin) {
+            // Soma para o Saldo Atual (se o dia já chegou)
+            if (isMesCorrente && d <= hoje) {
+                saldoAtualTotal += amountSigned;
+            }
+            // Soma para a Projeção de Fim de Mês (todo o passado + mês atual)
+            if (d < new Date(anoAtual, mesAtual + 1, 1)) {
+                saldoFimMesTotal += amountSigned;
+            }
         }
-        if (dataTrans <= hoje || isMesmoMes) {
-            trans.type === 'receita' ? saldoFimMesTotal += trans.amount : saldoFimMesTotal -= trans.amount;
+
+        // 2. Processa Projeções Históricas (Apenas para Compras Recorrentes)
+        if (t.isRecurring) {
+            let projYear = tYear;
+            let projMonth = tMonth + 1; // Começa a projetar no mês seguinte à origem
+
+            // Roda o relógio mês a mês até chegar no mês que estamos visualizando no painel
+            while (projYear < anoAtual || (projYear === anoAtual && projMonth <= mesAtual)) {
+                if (projMonth > 11) { projMonth = 0; projYear++; } // Vira o ano
+
+                const projMonthStr = `${projYear}-${String(projMonth + 1).padStart(2, '0')}`;
+                
+                // Verifica as regras de encerramento que criamos na etapa anterior
+                const isEnded = t.recurrenceEndDate && projMonthStr >= t.recurrenceEndDate.slice(0, 7);
+                if (isEnded) break; // A recorrência foi atualizada/cancelada no passado, paramos a bola de neve
+
+                const isSkipped = t.skippedDates && t.skippedDates.some(sd => sd.startsWith(projMonthStr));
+                
+                if (!isSkipped) {
+                    const projDate = new Date(projYear, projMonth, d.getDate());
+
+                    if (isMesCorrente && projDate <= hoje) {
+                        saldoAtualTotal += amountSigned;
+                    }
+                    if (projDate < new Date(anoAtual, mesAtual + 1, 1)) {
+                        saldoFimMesTotal += amountSigned;
+                    }
+                }
+                projMonth++;
+            }
         }
     });
 
