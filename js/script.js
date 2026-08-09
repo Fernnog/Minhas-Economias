@@ -922,15 +922,37 @@ form.addEventListener('submit', function(e) {
         if (isInstallmentEdit && editScope === 'this_and_future') {
             const [baseId, currentIndexStr] = id.split('_');
             const currentIndex = parseInt(currentIndexStr);
+            
+            // Capturamos a nova data base que o usuário preencheu no formulário
+            const newBaseDate = new Date(date + 'T00:00:00');
 
             transactions.forEach(t => {
                 if (t.id.startsWith(baseId + '_')) {
                     const tIndex = parseInt(t.id.split('_')[1]);
+                    
                     if (tIndex >= currentIndex) {
+                        // Resgata o denominador original (ex: o "12" de "1/12") para não quebrar a edição
+                        const totalInstallmentsMatch = t.desc.match(/\(\d+\/(\d+)\)$/);
+                        const totalInst = totalInstallmentsMatch ? totalInstallmentsMatch[1] : installments;
+
+                        // Atualiza valores financeiros e categorias
                         t.amount = amount;
                         t.type = type;
                         t.category = category;
                         t.paymentMethod = paymentMethod;
+                        t.desc = desc.replace(/\(\d+\/\d+\)$/, '').trim() + ` (${tIndex + 1}/${totalInst})`;
+                        
+                        // CORREÇÃO: Reagendamento em Cascata
+                        // Descobre quantos meses de diferença essa parcela tem da que estamos editando
+                        const monthOffset = tIndex - currentIndex; 
+                        
+                        // Cria uma data espelho e empurra os meses para frente
+                        const futureDate = new Date(newBaseDate);
+                        futureDate.setMonth(futureDate.getMonth() + monthOffset);
+                        
+                        // Grava a nova data no formato YYYY-MM-DD
+                        t.date = futureDate.toISOString().split('T')[0];
+
                         newItemsToSync.push(t);
                     }
                 }
@@ -1040,12 +1062,50 @@ form.addEventListener('submit', function(e) {
 });
 
 window.deleteTransaction = function(id) {
-    if (confirm('Deseja realmente excluir este lançamento?')) {
-        transactions = transactions.filter(t => t.id !== id);
-        saveData();
-        if (typeof FirebaseModule !== 'undefined') FirebaseModule.deleteData('transactions', id);
-        updateAllViews();
-        showToast('Lançamento excluído com sucesso!');
+    const isInstallment = id.includes('_');
+
+    if (isInstallment) {
+        // Fluxo Inteligente para Parceladas
+        const apagarFuturas = confirm('Esta é uma compra parcelada. Deseja excluir esta parcela e TODAS AS SEGUINTES (Cancelamento em lote)?\n\n[OK] = Apagar esta e as futuras\n[Cancelar] = Quero apagar apenas uma');
+        
+        if (apagarFuturas) {
+            const [baseId, currentIndexStr] = id.split('_');
+            const currentIndex = parseInt(currentIndexStr);
+            
+            // Remove a atual e todas com índice maior
+            transactions = transactions.filter(t => {
+                if (t.id.startsWith(baseId + '_')) {
+                    const tIndex = parseInt(t.id.split('_')[1]);
+                    if (tIndex >= currentIndex) {
+                        if (typeof FirebaseModule !== 'undefined') FirebaseModule.deleteData('transactions', t.id);
+                        return false; // Remove do array
+                    }
+                }
+                return t.id !== id; // Segurança
+            });
+            
+            saveData();
+            updateAllViews();
+            showToast('Parcelas excluídas em lote com sucesso!');
+        } else {
+            // Se recusou apagar em lote, confirma se quer apagar só aquela
+            if (confirm('Deseja excluir APENAS esta parcela específica?')) {
+                transactions = transactions.filter(t => t.id !== id);
+                saveData();
+                if (typeof FirebaseModule !== 'undefined') FirebaseModule.deleteData('transactions', id);
+                updateAllViews();
+                showToast('Parcela única excluída!');
+            }
+        }
+    } else {
+        // Fluxo Padrão (Compras únicas ou Recorrentes Originais)
+        if (confirm('Deseja realmente excluir este lançamento?')) {
+            transactions = transactions.filter(t => t.id !== id);
+            saveData();
+            if (typeof FirebaseModule !== 'undefined') FirebaseModule.deleteData('transactions', id);
+            updateAllViews();
+            showToast('Lançamento excluído com sucesso!');
+        }
     }
 };
 
