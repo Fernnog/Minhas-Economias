@@ -931,6 +931,209 @@ const ReportsModule = (function () {
     }
 
     // ===================================================
+    // EXTRATO POR CATEGORIA (Novo Hub V2)
+    // ===================================================
+    
+    let _catExtractState = { year: null, month: null, category: '' };
+    let _isExporting = false;
+
+    function _populateCatExtractSelect() {
+        const select = document.getElementById('report-catextract-select');
+        if (!select) return;
+        select.innerHTML = '<option value="">-- Escolha a Categoria para Filtrar --</option>';
+
+        if (typeof CategoryGroups !== 'undefined') {
+            const groups = CategoryGroups.getGroups();
+            const txns = _getTxns();
+            // Pega as categorias que realmente existem nos txns para evitar options vazias demais
+            const activeCats = [...new Set(txns.map(t => t.category))].filter(Boolean);
+            const assignedSet = new Set();
+            
+            groups.forEach(g => {
+                const subs = g.subcategories.filter(s => activeCats.includes(s));
+                if (subs.length === 0) return;
+                const optgroup = document.createElement('optgroup');
+                optgroup.label = g.name;
+                subs.sort().forEach(cat => {
+                    const opt = document.createElement('option');
+                    opt.value = cat; opt.textContent = cat;
+                    optgroup.appendChild(opt);
+                    assignedSet.add(cat);
+                });
+                select.appendChild(optgroup);
+            });
+
+            const ungrouped = activeCats.filter(c => !assignedSet.has(c) && c !== 'Sem Categoria');
+            if (ungrouped.length > 0) {
+                const grpOthers = document.createElement('optgroup');
+                grpOthers.label = 'Outros / Sem Vínculo';
+                ungrouped.sort().forEach(cat => {
+                    const opt = document.createElement('option');
+                    opt.value = cat; opt.textContent = cat;
+                    grpOthers.appendChild(opt);
+                });
+                select.appendChild(grpOthers);
+            }
+        }
+    }
+
+    function openCategoryExtract() {
+        const dialog = document.getElementById('report-catextract-dialog');
+        const monthInput = document.getElementById('report-catextract-month');
+        if (!dialog || !monthInput) return;
+
+        const today = new Date();
+        _catExtractState.year = today.getFullYear();
+        _catExtractState.month = today.getMonth();
+        _catExtractState.category = '';
+        
+        _populateCatExtractSelect();
+        
+        const select = document.getElementById('report-catextract-select');
+        if(select) select.value = '';
+
+        monthInput.value = `${_catExtractState.year}-${String(_catExtractState.month + 1).padStart(2, '0')}`;
+        
+        _renderCategoryExtract();
+        dialog.showModal();
+    }
+
+    function _catExtractMonth(value) {
+        if(!value) return;
+        const [y, m] = value.split('-');
+        _catExtractState.year = parseInt(y);
+        _catExtractState.month = parseInt(m) - 1;
+        _renderCategoryExtract();
+    }
+
+    function _catExtractCategory(value) {
+        _catExtractState.category = value;
+        _renderCategoryExtract();
+    }
+
+    function _renderCategoryExtract() {
+        const content = document.getElementById('report-catextract-content');
+        const titleMonth = document.getElementById('cat-extract-ui-month');
+        const titleCat = document.getElementById('cat-extract-ui-cat');
+        
+        if (!content || !titleMonth || !titleCat) return;
+
+        const dateObj = new Date(_catExtractState.year, _catExtractState.month, 1);
+        const mLabel = dateObj.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+        titleMonth.textContent = mLabel.charAt(0).toUpperCase() + mLabel.slice(1);
+        titleCat.textContent = _catExtractState.category || 'Nenhuma categoria selecionada';
+
+        if (!_catExtractState.category) {
+            content.innerHTML = '<p class="report-empty">Selecione uma categoria acima para listar e exportar os lançamentos.</p>';
+            return;
+        }
+
+        const txns = _getTxns();
+        const filtered = [];
+        const { year, month, category } = _catExtractState;
+        const monthStr = `${year}-${String(month + 1).padStart(2, '0')}`;
+
+        txns.forEach(t => {
+            if (t.category !== category) return;
+            
+            const d = new Date(t.date + 'T00:00:00');
+            const tYear = d.getFullYear();
+            const tMonth = d.getMonth();
+            let isActive = false;
+            let isProjected = false;
+
+            if (tYear === year && tMonth === month) {
+                isActive = true;
+            } else if (t.isRecurring && (tYear < year || (tYear === year && tMonth < month))) {
+                const isSkipped = t.skippedDates && t.skippedDates.some(sd => sd.startsWith(monthStr));
+                const fim = t.recurrenceEndDate ? new Date(t.recurrenceEndDate) : null;
+                if (!isSkipped && (!fim || new Date(year, month, 1) < fim)) {
+                    isActive = true;
+                    isProjected = true;
+                }
+            }
+
+            if (isActive) {
+                const projectedDate = isProjected ? `${monthStr}-${t.date.slice(8, 10)}` : t.date;
+                filtered.push({ ...t, date: projectedDate, isProjected });
+            }
+        });
+
+        filtered.sort((a, b) => new Date(a.date) - new Date(b.date));
+
+        if (filtered.length === 0) {
+            content.innerHTML = `<p class="report-empty" style="color:var(--text-light);">Nenhum registro encontrado para <strong>${category}</strong> em ${titleMonth.textContent}.</p>`;
+            return;
+        }
+
+        let total = filtered.reduce((acc, t) => acc + (t.type === 'despesa' ? -t.amount : t.amount), 0);
+        const colorClass = total < 0 ? 'var(--danger)' : 'var(--success)';
+
+        content.innerHTML = `
+            <div class="cat-tx-summary">
+                <span>${filtered.length} lançamento(s)</span>
+                <span class="cat-tx-total" style="color: ${colorClass}">${_fmt(Math.abs(total))}</span>
+            </div>
+            <ul class="cat-tx-list">
+                ${filtered.map(t => {
+                    const dt = new Date(t.date + 'T00:00:00').toLocaleDateString('pt-BR');
+                    const color = t.type === 'despesa' ? 'var(--danger)' : 'var(--success)';
+                    return `
+                        <li class="cat-tx-item ${t.isProjected ? 'projected' : ''}">
+                            <div class="cat-tx-info">
+                                <span class="cat-tx-desc">${t.desc || '—'}</span>
+                                ${t.isProjected ? '<span class="cat-tx-badge">Recorrente/Projetado</span>' : ''}
+                            </div>
+                            <div class="cat-tx-meta">
+                                <span class="cat-tx-date">${dt}</span>
+                                <span class="cat-tx-amount" style="color:${color}">${_fmt(t.amount)}</span>
+                            </div>
+                        </li>`;
+                }).join('')}
+            </ul>`;
+    }
+
+    async function exportCategoryExtractToPDF() {
+        if (_isExporting) return; 
+        
+        if (!_catExtractState.category) {
+            if(typeof showToast === 'function') showToast('Selecione uma categoria antes de exportar.', 'warning');
+            return;
+        }
+
+        _isExporting = true;
+        const btn = document.getElementById('btn-export-catextract');
+        const modalBody = document.getElementById('report-catextract-dialog');
+        const scrollArea = document.getElementById('report-catextract-scroll-area');
+        
+        if(btn) btn.classList.add('btn-is-loading');
+        
+        modalBody.classList.add('pdf-exporting-state');
+
+        // Esperar o browser fazer o reflow da tela antes de fotografar
+        await new Promise(resolve => setTimeout(resolve, 80));
+
+        const opt = {
+            margin:       15,
+            filename:     `Extrato_${_catExtractState.category.replace(/[^a-z0-9]/gi, '_')}_${_catExtractState.year}_${String(_catExtractState.month + 1).padStart(2, '0')}.pdf`,
+            image:        { type: 'jpeg', quality: 0.98 },
+            html2canvas:  { scale: 2, useCORS: true, windowWidth: scrollArea.scrollWidth },
+            jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+        };
+
+        try {
+            await html2pdf().set(opt).from(scrollArea).save();
+        } catch (e) {
+            console.error('[PDF Export Erro]:', e);
+            if(typeof showToast === 'function') showToast('Erro ao gerar PDF.', 'danger');
+        } finally {
+            modalBody.classList.remove('pdf-exporting-state');
+            if(btn) btn.classList.remove('btn-is-loading');
+            _isExporting = false;
+        }
+    }
+
+    // ===================================================
     // EXPORTAÇÃO PARA PDF (Dashboard original)
     // ===================================================
     async function exportPanelToPDF() {
@@ -979,12 +1182,16 @@ const ReportsModule = (function () {
         openIncomeRigidity, 
         openPaymentMethodReport,
         openImprevistosAlert,
+        openCategoryExtract,
         exportPanelToPDF,
         exportImprevistosToPDF,
         exportAITxtReport,
+        exportCategoryExtractToPDF,
         _pmFilter,
         _pmMonth,
-        _imprevMonth
+        _imprevMonth,
+        _catExtractMonth,
+        _catExtractCategory
     };
 
 })();

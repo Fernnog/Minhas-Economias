@@ -768,3 +768,111 @@
     background: var(--bg); border: 1px solid var(--border); border-radius: 6px; cursor: pointer;
 }
 .projector-cat-item input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--primary); }
+
+/* ===================================================
+   EXTRATO POR CATEGORIA — CONTROLES & IMPRESSÃO
+   =================================================== */
+
+.report-launcher-catextract { border-color: rgba(16, 185, 129, 0.4); }
+.report-launcher-catextract:hover {
+    border-color: rgba(16, 185, 129, 0.75);
+    box-shadow: 0 8px 24px rgba(16, 185, 129, 0.18);
+}
+.report-launcher-catextract .report-card-icon { color: #10B981; }
+
+.pdf-exporting-state #report-catextract-scroll-area {
+    max-height: none !important;
+    overflow-y: visible !important;
+    padding: 20px 30px !important; 
+    background: var(--bg) !important;
+}
+
+.pdf-exporting-state .no-print {
+    display: none !important;
+}
+
+.pdf-exporting-state .cat-tx-item {
+    page-break-inside: avoid;
+    break-inside: avoid;
+}
+
+.btn-is-loading {
+    pointer-events: none;
+    opacity: 0.7;
+    background: rgba(201, 168, 76, 0.15) !important;
+}
+.btn-is-loading .export-icon-default { display: none; }
+.btn-is-loading .export-icon-loading { display: block !important; }
+
+.cat-tx-summary {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem;
+    background: var(--surface);
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    margin-bottom: 1.5rem;
+    font-weight: 700;
+    font-size: 0.9rem;
+}
+
+.cat-tx-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.8rem;
+}
+
+.cat-tx-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.9rem 1rem;
+    background: var(--surface);
+    border-radius: 8px;
+    border: 1px solid var(--border);
+}
+
+.cat-tx-item.projected {
+    border-style: dashed;
+    opacity: 0.8;
+}
+
+.cat-tx-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+}
+
+.cat-tx-desc {
+    font-weight: 600;
+    font-size: 0.9rem;
+    color: var(--text);
+}
+
+.cat-tx-badge {
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: var(--primary);
+    text-transform: uppercase;
+}
+
+.cat-tx-meta {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.3rem;
+}
+
+.cat-tx-date {
+    font-size: 0.75rem;
+    color: var(--text-light);
+}
+
+.cat-tx-amount {
+    font-weight: 700;
+    font-size: 0.95rem;
+}
