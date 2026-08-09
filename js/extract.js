@@ -298,15 +298,17 @@ const ExtractModule = (function() {
             }
         }
 
-        // --- Saldo acumulado até o início do mês ---
-        let balance = transactions.reduce((acc, t) => {
-            if (new Date(t.date + 'T00:00:00') < new Date(currentYear, currentMonth, 1)) {
-                return acc + (t.type === 'receita' ? t.amount : -t.amount);
-            }
-            return acc;
-        }, 0);
+        // --- Saldo acumulado (Seed Balance) via SSOT ---
+        // Calcula o saldo exato até as 23:59:59 do último dia do mês ANTERIOR
+        const dataInicioMes = new Date(currentYear, currentMonth, 1);
+        const dataFimMesAnterior = new Date(dataInicioMes.getTime() - 1); 
+        
+        // Chamada única ao motor matemático pesado
+        let balance = typeof window.calculateCumulativeBalanceUpTo === 'function' 
+            ? window.calculateCumulativeBalanceUpTo(dataFimMesAnterior)
+            : 0;
 
-        // --- Agrupa por data ---
+        // --- Agrupa por data (Usa o reduce com matemática leve O(N)) ---
         const groups = [...filtered].sort((a, b) => new Date(a.date) - new Date(b.date)).reduce((acc, t) => {
             if (!acc[t.date]) acc[t.date] = { items: [], dayBalance: 0 };
             balance += (t.type === 'receita' ? t.amount : -t.amount);

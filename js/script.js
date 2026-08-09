@@ -61,6 +61,52 @@ window.isTransactionActiveInMonth = function(t, targetYear, targetMonth) {
 };
 
 /**
+ * FONTE ÚNICA DA VERDADE (SSOT) - Cálculo de Saldo Cumulativo
+ * Avalia todo o histórico de transações, projetando recorrências corretamente (respeitando meses curtos).
+ */
+window.calculateCumulativeBalanceUpTo = function(targetDateObj) {
+    let total = 0;
+    const targetYear = targetDateObj.getFullYear();
+    const targetMonth = targetDateObj.getMonth();
+
+    transactions.forEach(t => {
+        const dataOrigem = new Date(t.date + 'T00:00:00');
+        const amountSigned = t.type === 'receita' ? t.amount : -t.amount;
+
+        if (!t.isRecurring) {
+            const monthStr = t.date.slice(0, 7);
+            if (t.skippedDates && t.skippedDates.includes(monthStr)) return;
+            if (dataOrigem <= targetDateObj) total += amountSigned;
+        } else {
+            let iterYear = dataOrigem.getFullYear();
+            let iterMonth = dataOrigem.getMonth();
+
+            while (iterYear < targetYear || (iterYear === targetYear && iterMonth <= targetMonth)) {
+                const iterMonthStr = `${iterYear}-${String(iterMonth + 1).padStart(2, '0')}`;
+                
+                // Quebra se a recorrência terminou
+                if (t.recurrenceEndDate && iterMonthStr >= t.recurrenceEndDate.slice(0, 7)) break;
+
+                // Processa se a parcela não foi pulada/mutada
+                if (!(t.skippedDates && t.skippedDates.some(sd => sd.startsWith(iterMonthStr)))) {
+                    const diaOriginal = dataOrigem.getDate();
+                    const ultimoDiaDoMesIterado = new Date(iterYear, iterMonth + 1, 0).getDate();
+                    // Proteção contra o "Bug do dia 31"
+                    const diaSeguro = Math.min(diaOriginal, ultimoDiaDoMesIterado);
+                    const dataProjetada = new Date(iterYear, iterMonth, diaSeguro);
+
+                    if (dataProjetada <= targetDateObj) total += amountSigned;
+                }
+
+                iterMonth++;
+                if (iterMonth > 11) { iterMonth = 0; iterYear++; }
+            }
+        }
+    });
+    return total;
+};
+
+/**
  * FUNÇÃO UTILITÁRIA GLOBAL — Fonte Única da Verdade para Gastos Mensais (Otimizada)
  */
 window.getMonthExpenses = function(mesAlvo, anoAlvo, includeUncategorized = false) {
@@ -422,59 +468,15 @@ function updateDashboardData() {
     let saldoFimMesTotal = 0;
     const gastosPorCategoria = getMonthExpenses(mesAtual, anoAtual); // PRESERVADO PARA NÃO QUEBRAR OS GRÁFICOS
     
-    // NOVO CÁLCULO CUMULATIVO BLINDADO
-    transactions.forEach(t => {
-        const d = new Date(t.date + 'T00:00:00');
-        const tMonth = d.getMonth();
-        const tYear = d.getFullYear();
-        const amountSigned = t.type === 'receita' ? t.amount : -t.amount;
-        
-        // 1. Processa a Transação Original (ou compras únicas/parceladas)
-        const originMonthStr = t.date.slice(0, 7);
-        const isSkippedAtOrigin = t.skippedDates && t.skippedDates.includes(originMonthStr);
+    // NOVA ARQUITETURA: Uso do Motor SSOT
+    // Calcula o limite do mês atual para a projeção final
+    const ultimoDiaDoMes = new Date(anoAtual, mesAtual + 1, 0, 23, 59, 59);
+    
+    // Se estamos vendo o mês corrente, calcula até o dia de hoje. Se for mês passado/futuro, calcula o mês cheio.
+    const dataAlvoAtual = isMesCorrente ? hoje : ultimoDiaDoMes;
 
-        if (!isSkippedAtOrigin) {
-            // Soma para o Saldo Atual (se o dia já chegou)
-            if (isMesCorrente && d <= hoje) {
-                saldoAtualTotal += amountSigned;
-            }
-            // Soma para a Projeção de Fim de Mês (todo o passado + mês atual)
-            if (d < new Date(anoAtual, mesAtual + 1, 1)) {
-                saldoFimMesTotal += amountSigned;
-            }
-        }
-
-        // 2. Processa Projeções Históricas (Apenas para Compras Recorrentes)
-        if (t.isRecurring) {
-            let projYear = tYear;
-            let projMonth = tMonth + 1; // Começa a projetar no mês seguinte à origem
-
-            // Roda o relógio mês a mês até chegar no mês que estamos visualizando no painel
-            while (projYear < anoAtual || (projYear === anoAtual && projMonth <= mesAtual)) {
-                if (projMonth > 11) { projMonth = 0; projYear++; } // Vira o ano
-
-                const projMonthStr = `${projYear}-${String(projMonth + 1).padStart(2, '0')}`;
-                
-                // Verifica as regras de encerramento que criamos na etapa anterior
-                const isEnded = t.recurrenceEndDate && projMonthStr >= t.recurrenceEndDate.slice(0, 7);
-                if (isEnded) break; // A recorrência foi atualizada/cancelada no passado, paramos a bola de neve
-
-                const isSkipped = t.skippedDates && t.skippedDates.some(sd => sd.startsWith(projMonthStr));
-                
-                if (!isSkipped) {
-                    const projDate = new Date(projYear, projMonth, d.getDate());
-
-                    if (isMesCorrente && projDate <= hoje) {
-                        saldoAtualTotal += amountSigned;
-                    }
-                    if (projDate < new Date(anoAtual, mesAtual + 1, 1)) {
-                        saldoFimMesTotal += amountSigned;
-                    }
-                }
-                projMonth++;
-            }
-        }
-    });
+    saldoAtualTotal = window.calculateCumulativeBalanceUpTo(dataAlvoAtual);
+    saldoFimMesTotal = window.calculateCumulativeBalanceUpTo(ultimoDiaDoMes);
 
     const saldoAtualDisplay = document.getElementById('saldo-atual-display');
     const saldoFimMesDisplay = document.getElementById('saldo-fim-mes-display');
@@ -1240,6 +1242,19 @@ const SyncModule = (function() {
 
     function init() {
         updateUI();
+        
+        // Atacha o evento DIRETAMENTE ao input, evitando conflito de z-index com o card
+        document.querySelectorAll('.hidden-sync-date').forEach(input => {
+            input.addEventListener('click', function(e) {
+                if (typeof this.showPicker === 'function') {
+                    try {
+                        this.showPicker();
+                    } catch (err) {
+                        // Fallback natural do navegador
+                    }
+                }
+            });
+        });
     }
 
     function saveDate(method, dateVal) {
