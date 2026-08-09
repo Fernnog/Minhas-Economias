@@ -1093,6 +1093,7 @@ const ReportsModule = (function () {
             </ul>`;
     }
 
+    // Exportação Otimizada e Corrigida (Hotfix)
     async function exportCategoryExtractToPDF() {
         if (_isExporting) return; 
         
@@ -1108,16 +1109,22 @@ const ReportsModule = (function () {
         
         if(btn) btn.classList.add('btn-is-loading');
         
+        // Desfaz o max-height e overflow para capturar a lista inteira
         modalBody.classList.add('pdf-exporting-state');
 
-        // Esperar o browser fazer o reflow da tela antes de fotografar
-        await new Promise(resolve => setTimeout(resolve, 80));
+        // Aumentamos o tempo de espera (150ms) para garantir que o navegador repinte a tela antes da foto
+        await new Promise(resolve => setTimeout(resolve, 150));
 
         const opt = {
             margin:       15,
             filename:     `Extrato_${_catExtractState.category.replace(/[^a-z0-9]/gi, '_')}_${_catExtractState.year}_${String(_catExtractState.month + 1).padStart(2, '0')}.pdf`,
             image:        { type: 'jpeg', quality: 0.98 },
-            html2canvas:  { scale: 2, useCORS: true, windowWidth: scrollArea.scrollWidth },
+            html2canvas:  { 
+                scale: 2, 
+                useCORS: true,
+                scrollY: 0, // Garante que a foto comece exatamente no topo
+                backgroundColor: '#FAF7F2' // Força a renderização do fundo Creme da sua paleta, evitando PDFs transparentes/brancos
+            },
             jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
         };
 
@@ -1127,6 +1134,7 @@ const ReportsModule = (function () {
             console.error('[PDF Export Erro]:', e);
             if(typeof showToast === 'function') showToast('Erro ao gerar PDF.', 'danger');
         } finally {
+            // Restaura o estado da UI instantaneamente
             modalBody.classList.remove('pdf-exporting-state');
             if(btn) btn.classList.remove('btn-is-loading');
             _isExporting = false;

@@ -780,17 +780,20 @@
 }
 .report-launcher-catextract .report-card-icon { color: #10B981; }
 
+/* Controles de Renderização de Impressão PDF (Corrigido) */
 .pdf-exporting-state #report-catextract-scroll-area {
     max-height: none !important;
-    overflow-y: visible !important;
-    padding: 20px 30px !important; 
-    background: var(--bg) !important;
+    height: auto !important;
+    overflow: visible !important;
+    padding: 20px 10px !important; 
+    background-color: #FAF7F2 !important; /* Fundo sólido forçado (Creme da paleta) */
 }
 
 .pdf-exporting-state .no-print {
     display: none !important;
 }
 
+/* Proteção de quebra de página: impede que um lançamento seja cortado ao meio no PDF */
 .pdf-exporting-state .cat-tx-item {
     page-break-inside: avoid;
     break-inside: avoid;
