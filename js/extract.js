@@ -229,18 +229,19 @@ const ExtractModule = (function() {
 
         // --- Monta lista base do mês ---
         const allMonth = [];
+        const currentMonthStr = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}`;
+        
         transactions.forEach(t => {
-            const d = new Date(t.date + 'T00:00:00');
-            const tMonth = d.getMonth();
-            const tYear = d.getFullYear();
-
-            if (tMonth === currentMonth && tYear === currentYear) {
-                allMonth.push(t);
-            } else if (t.isRecurring && (tYear < currentYear || (tYear === currentYear && tMonth < currentMonth))) {
-                const projDateStr = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-                if (t.recurrenceEndDate && new Date(currentYear, currentMonth, 1) >= new Date(t.recurrenceEndDate)) return;
-                if (t.skippedDates && t.skippedDates.includes(projDateStr)) return;
-                allMonth.push({ ...t, id: t.id + '_proj', date: projDateStr });
+            // Delega TUDO para a SSOT global
+            if (window.isTransactionActiveInMonth(t, currentYear, currentMonth)) {
+                const isOriginMonth = t.date.slice(0, 7) === currentMonthStr;
+                const projDateStr = isOriginMonth ? t.date : `${currentMonthStr}-${t.date.slice(8, 10)}`;
+                
+                if (isOriginMonth) {
+                    allMonth.push(t);
+                } else {
+                    allMonth.push({ ...t, id: t.id + '_proj', date: projDateStr });
+                }
             }
         });
 

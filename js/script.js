@@ -26,6 +26,41 @@ let pinnedBudgets = JSON.parse(localStorage.getItem('fin_pinned_budgets')) || []
 let _expenseCache = {}; // Cache para otimização de renderização
 
 /**
+ * FONTE ÚNICA DE VERDADE (SSOT) PARA VISIBILIDADE DE TRANSAÇÕES
+ * Decide se uma transação deve existir (ser contabilizada/renderizada) em um mês específico.
+ * Imune a timezones (usa string lexicográfica YYYY-MM).
+ */
+window.isTransactionActiveInMonth = function(t, targetYear, targetMonth) {
+    const targetMonthStr = `${targetYear}-${String(targetMonth + 1).padStart(2, '0')}`;
+    const tOriginMonthStr = t.date.slice(0, 7); // Ex: "2024-05"
+
+    // 1. CHECAGEM DE EXCEÇÃO (A transação foi pulada/mutada neste mês exato?)
+    if (t.skippedDates && t.skippedDates.some(sd => sd.startsWith(targetMonthStr))) {
+        return false;
+    }
+
+    // 2. CHECAGEM DE ENCERRAMENTO (A recorrência foi cancelada ANTES deste mês?)
+    if (t.recurrenceEndDate) {
+        const endMonthStr = t.recurrenceEndDate.slice(0, 7);
+        if (targetMonthStr >= endMonthStr) {
+            return false;
+        }
+    }
+
+    // 3. É O MÊS DE ORIGEM?
+    if (tOriginMonthStr === targetMonthStr) {
+        return true;
+    }
+
+    // 4. É RECORRENTE DE UM MÊS PASSADO?
+    if (t.isRecurring && tOriginMonthStr < targetMonthStr) {
+        return true;
+    }
+
+    return false;
+};
+
+/**
  * FUNÇÃO UTILITÁRIA GLOBAL — Fonte Única da Verdade para Gastos Mensais (Otimizada)
  */
 window.getMonthExpenses = function(mesAlvo, anoAlvo, includeUncategorized = false) {
@@ -33,25 +68,12 @@ window.getMonthExpenses = function(mesAlvo, anoAlvo, includeUncategorized = fals
     if (_expenseCache[cacheKey]) return _expenseCache[cacheKey];
 
     const expenses = {};
-    const mesStr = `${anoAlvo}-${String(mesAlvo + 1).padStart(2, '0')}`;
-
+    
     transactions.forEach(t => {
         if (t.type !== 'despesa') return;
         if (!includeUncategorized && t.category.toLowerCase() === 'sem categoria') return;
-
-        const d = new Date(t.date + 'T00:00:00');
-        const tMonth = d.getMonth();
-        const tYear = d.getFullYear();
-
-        if (tYear === anoAlvo && tMonth === mesAlvo) {
-            if (t.skippedDates && t.skippedDates.some(sd => sd.startsWith(mesStr))) return;
-            expenses[t.category] = (expenses[t.category] || 0) + t.amount;
-            return;
-        }
-
-        if (t.isRecurring && (tYear < anoAlvo || (tYear === anoAlvo && tMonth < mesAlvo))) {
-            if (t.recurrenceEndDate && new Date(anoAlvo, mesAlvo, 1) >= new Date(t.recurrenceEndDate)) return;
-            if (t.skippedDates && t.skippedDates.some(sd => sd.startsWith(mesStr))) return;
+        
+        if (window.isTransactionActiveInMonth(t, anoAlvo, mesAlvo)) {
             expenses[t.category] = (expenses[t.category] || 0) + t.amount;
         }
     });
@@ -67,19 +89,7 @@ window.getMonthIncome = function(mesAlvo, anoAlvo) {
     const income = {};
     transactions.forEach(t => {
         if (t.type !== 'receita') return;
-        const d = new Date(t.date + 'T00:00:00');
-        const tMonth = d.getMonth();
-        const tYear  = d.getFullYear();
-
-        if (tYear === anoAlvo && tMonth === mesAlvo) {
-            income[t.category] = (income[t.category] || 0) + t.amount;
-            return;
-        }
-        if (t.isRecurring && (tYear < anoAlvo || (tYear === anoAlvo && tMonth < mesAlvo))) {
-            if (t.recurrenceEndDate) {
-                const fim = new Date(t.recurrenceEndDate);
-                if (new Date(anoAlvo, mesAlvo, 1) >= fim) return;
-            }
+        if (window.isTransactionActiveInMonth(t, anoAlvo, mesAlvo)) {
             income[t.category] = (income[t.category] || 0) + t.amount;
         }
     });
@@ -414,22 +424,11 @@ function updateDashboardData() {
     const todasTransacoes = [];
 
     transactions.forEach(t => {
-        const d = new Date(t.date + 'T00:00:00');
-        const tMonth = d.getMonth();
-        const tYear = d.getFullYear();
-        todasTransacoes.push(t);
-
-        if (t.isRecurring && (tYear < anoAtual || (tYear === anoAtual && tMonth < mesAtual))) {
-            const mesStr = `${anoAtual}-${String(mesAtual + 1).padStart(2, '0')}`;
-            if (t.skippedDates && t.skippedDates.some(sd => sd.startsWith(mesStr))) return;
-            const dataProjetada = new Date(anoAtual, mesAtual, d.getDate());
-            const dataTermino = t.recurrenceEndDate ? new Date(t.recurrenceEndDate) : null;
-            if (!dataTermino || dataProjetada < dataTermino) {
-                todasTransacoes.push({
-                    ...t,
-                    date: `${anoAtual}-${String(mesAtual + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-                });
-            }
+        if (window.isTransactionActiveInMonth(t, anoAtual, mesAtual)) {
+            const isOriginMonth = t.date.slice(0, 7) === `${anoAtual}-${String(mesAtual + 1).padStart(2, '0')}`;
+            const dataProjetada = isOriginMonth ? t.date : `${anoAtual}-${String(mesAtual + 1).padStart(2, '0')}-${t.date.slice(8, 10)}`;
+            
+            todasTransacoes.push({ ...t, date: dataProjetada });
         }
     });
 
@@ -825,31 +824,21 @@ function _getMonthTransactionsByCategory(category, mesAlvo, anoAlvo) {
     const mesStr = `${anoAlvo}-${String(mesAlvo + 1).padStart(2, '0')}`;
 
     transactions.forEach(t => {
-        if (t.type !== 'despesa') return;
-        if (t.category !== category) return;
+        if (t.type !== 'despesa' || t.category !== category) return;
 
-        const d = new Date(t.date + 'T00:00:00');
-        const tMonth = d.getMonth();
-        const tYear = d.getFullYear();
-
-        if (tYear === anoAlvo && tMonth === mesAlvo) {
-            if (t.skippedDates && t.skippedDates.some(sd => sd.startsWith(mesStr))) return;
-            result.push({ ...t, isProjected: false });
-            return;
-        }
-
-        if (t.isRecurring && (tYear < anoAlvo || (tYear === anoAlvo && tMonth < mesAlvo))) {
-            if (t.recurrenceEndDate) {
-                const fim = new Date(t.recurrenceEndDate);
-                if (new Date(anoAlvo, mesAlvo, 1) >= fim) return;
-            }
-            if (t.skippedDates && t.skippedDates.some(sd => sd.startsWith(mesStr))) return;
-            const diaOriginal = String(d.getDate()).padStart(2, '0');
-            result.push({ ...t, date: `${mesStr}-${diaOriginal}`, isProjected: true });
+        if (window.isTransactionActiveInMonth(t, anoAlvo, mesAlvo)) {
+            const isOriginMonth = t.date.slice(0, 7) === mesStr;
+            const dataProjetada = isOriginMonth ? t.date : `${mesStr}-${t.date.slice(8, 10)}`;
+            
+            result.push({ 
+                ...t, 
+                date: dataProjetada, 
+                isProjected: !isOriginMonth 
+            });
         }
     });
-
-    result.sort((a, b) => new Date(a.date + 'T00:00:00') - new Date(b.date + 'T00:00:00'));
+    
+    result.sort((a, b) => a.date.localeCompare(b.date)); // Sort veloz por string
     return result;
 }
 
@@ -972,17 +961,26 @@ form.addEventListener('submit', function(e) {
             if (exceptionParent) {
                 const parentTx = transactions.find(t => t.id === exceptionParent);
                 const editScope = document.getElementById('trans-edit-scope')?.value;
+                
                 if (parentTx) {
+                    parentTx.skippedDates = parentTx.skippedDates || [];
+                    // Garante que o mês exato da alteração não mostre a versão antiga
+                    if (!parentTx.skippedDates.includes(exceptionDate)) {
+                        parentTx.skippedDates.push(exceptionDate);
+                    }
+
                     if (editScope === 'this_and_future') {
+                        // Encapsula o término do contrato via string YYYY-MM
                         parentTx.recurrenceEndDate = exceptionDate;
                         newItemsToSync.push(parentTx);
+
                         const transactionData = { id: Date.now().toString(), type, amount, category, date, desc, isRecurring: true, paymentMethod };
                         transactions.push(transactionData);
                         newItemsToSync.push(transactionData);
                     } else {
-                        parentTx.skippedDates = parentTx.skippedDates || [];
-                        parentTx.skippedDates.push(exceptionDate);
+                        // Scope: only_this
                         newItemsToSync.push(parentTx);
+
                         const transactionData = { id: Date.now().toString(), type, amount, category, date, desc, isRecurring: false, paymentMethod };
                         transactions.push(transactionData);
                         newItemsToSync.push(transactionData);
