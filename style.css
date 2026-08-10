@@ -1914,3 +1914,47 @@ button.btn-voltar.btn-dark-gold {
     opacity: 0;
     pointer-events: none;
 }
+
+/* =============================================
+   OFF-SCREEN RENDER: EXPORTAÇÃO DE PDF ISOLADA
+   ============================================= */
+
+/* Container clonado e jogado para fora da área visível */
+.offscreen-print-container {
+    position: absolute !important;
+    top: -9999px !important;
+    left: -9999px !important;
+    width: 800px !important; /* Trava a largura padrão para folha A4 */
+    max-width: none !important;
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+    background-color: var(--surface) !important; /* Fundo Creme limpo */
+    padding: 30px !important; /* Respiro do documento */
+    z-index: -9999;
+    box-shadow: none !important;
+    border: none !important;
+}
+
+/* Oculta dropdowns e botões indesejados no PDF */
+.offscreen-print-container .no-print {
+    display: none !important;
+}
+
+/* Garante que a lista se expanda completamente */
+.offscreen-print-container .cat-tx-list {
+    display: block !important;
+    height: auto !important;
+    overflow: visible !important;
+}
+
+/* 
+   Impede que a quebra de página corte um lançamento ao meio 
+   Compatibilidade cross-browser para impressão/PDF 
+*/
+.offscreen-print-container .cat-tx-item {
+    page-break-inside: avoid;
+    break-inside: avoid;
+    box-shadow: none; /* Removemos sombras para o PDF parecer "papel" */
+    border-color: rgba(201, 168, 76, 0.4);
+}

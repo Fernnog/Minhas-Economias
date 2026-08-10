@@ -1104,38 +1104,45 @@ const ReportsModule = (function () {
 
         _isExporting = true;
         const btn = document.getElementById('btn-export-catextract');
-        const modalBody = document.getElementById('report-catextract-dialog');
-        const scrollArea = document.getElementById('report-catextract-scroll-area');
+        const originalArea = document.getElementById('report-catextract-scroll-area');
         
         if(btn) btn.classList.add('btn-is-loading');
-        
-        // Desfaz o max-height e overflow para capturar a lista inteira
-        modalBody.classList.add('pdf-exporting-state');
 
-        // Aumentamos o tempo de espera (150ms) para garantir que o navegador repinte a tela antes da foto
-        await new Promise(resolve => setTimeout(resolve, 150));
+        // 1. Criamos um clone do node completo
+        const cloneNode = originalArea.cloneNode(true);
+        // 2. Injetamos a classe que isola o CSS para impressão e remove limitações
+        cloneNode.classList.add('offscreen-print-container');
+        // 3. Adicionamos ao final do DOM (invisível para o usuário, mas acessível ao canvas)
+        document.body.appendChild(cloneNode);
+
+        // Aguardamos um micro-tick para garantir que o navegador calculou as alturas do clone
+        await new Promise(resolve => setTimeout(resolve, 50));
 
         const opt = {
             margin:       15,
             filename:     `Extrato_${_catExtractState.category.replace(/[^a-z0-9]/gi, '_')}_${_catExtractState.year}_${String(_catExtractState.month + 1).padStart(2, '0')}.pdf`,
             image:        { type: 'jpeg', quality: 0.98 },
+            // pagebreak: Instrução nativa para evitar rasgar os cards na divisão de página
+            pagebreak:    { mode: ['avoid-all', 'css', 'legacy'] },
             html2canvas:  { 
                 scale: 2, 
                 useCORS: true,
-                scrollY: 0, // Garante que a foto comece exatamente no topo
-                backgroundColor: '#FAF7F2' // Força a renderização do fundo Creme da sua paleta, evitando PDFs transparentes/brancos
+                scrollY: 0, 
+                windowWidth: 800, // Força o engine a renderizar como se fosse desktop (resolve problemas no mobile)
+                backgroundColor: '#FAF7F2' 
             },
             jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
         };
 
         try {
-            await html2pdf().set(opt).from(scrollArea).save();
+            // Executamos a geração mirando no CLONE oculto, não na UI visível
+            await html2pdf().set(opt).from(cloneNode).save();
         } catch (e) {
             console.error('[PDF Export Erro]:', e);
             if(typeof showToast === 'function') showToast('Erro ao gerar PDF.', 'danger');
         } finally {
-            // Restaura o estado da UI instantaneamente
-            modalBody.classList.remove('pdf-exporting-state');
+            // Limpeza impecável: Destrói o clone da memória e restaura o botão
+            cloneNode.remove();
             if(btn) btn.classList.remove('btn-is-loading');
             _isExporting = false;
         }
