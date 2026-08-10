@@ -1093,7 +1093,6 @@ const ReportsModule = (function () {
             </ul>`;
     }
 
-    // Exportação Otimizada e Corrigida (Hotfix)
     async function exportCategoryExtractToPDF() {
         if (_isExporting) return; 
         
@@ -1103,48 +1102,57 @@ const ReportsModule = (function () {
         }
 
         _isExporting = true;
-        const btn = document.getElementById('btn-export-catextract');
-        const originalArea = document.getElementById('report-catextract-scroll-area');
+        const dialog = document.getElementById('report-catextract-dialog');
+        const captureArea = document.getElementById('report-catextract-scroll-area');
         
-        if(btn) btn.classList.add('btn-is-loading');
+        // 1. FECHA A CORTINA (Mostra o overlay de Loading cobrindo a tela toda)
+        const overlay = document.createElement('div');
+        overlay.className = 'pdf-loading-overlay';
+        overlay.innerHTML = `
+            <svg class="spin-icon" viewBox="0 0 24 24" width="50" height="50" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 12a9 9 0 1 1-6.219-8.56"></path>
+            </svg>
+            <p style="margin-top:1rem; font-weight:700; font-size:1.1rem; color:var(--text);">Preparando Relatório...</p>
+        `;
+        document.body.appendChild(overlay);
 
-        // 1. Criamos um clone do node completo
-        const cloneNode = originalArea.cloneNode(true);
-        // 2. Injetamos a classe que isola o CSS para impressão e remove limitações
-        cloneNode.classList.add('offscreen-print-container');
-        // 3. Adicionamos ao final do DOM (invisível para o usuário, mas acessível ao canvas)
-        document.body.appendChild(cloneNode);
+        // 2. EXPANDIR O MODAL POR TRÁS DA CORTINA
+        dialog.classList.add('pdf-export-expanded');
 
-        // Aguardamos um micro-tick para garantir que o navegador calculou as alturas do clone
-        await new Promise(resolve => setTimeout(resolve, 50));
+        // Aguarda o navegador redesenhar a tela (agora com tamanho total)
+        await new Promise(resolve => setTimeout(resolve, 200));
 
+        // 3. CONFIGURAÇÕES DO PDF
         const opt = {
             margin:       15,
             filename:     `Extrato_${_catExtractState.category.replace(/[^a-z0-9]/gi, '_')}_${_catExtractState.year}_${String(_catExtractState.month + 1).padStart(2, '0')}.pdf`,
             image:        { type: 'jpeg', quality: 0.98 },
-            // pagebreak: Instrução nativa para evitar rasgar os cards na divisão de página
-            pagebreak:    { mode: ['avoid-all', 'css', 'legacy'] },
+            pagebreak:    { mode: ['avoid-all', 'css', 'legacy'] }, // Evita rasgar cards no meio da folha
             html2canvas:  { 
                 scale: 2, 
                 useCORS: true,
-                scrollY: 0, 
-                windowWidth: 800, // Força o engine a renderizar como se fosse desktop (resolve problemas no mobile)
+                scrollY: 0,
                 backgroundColor: '#FAF7F2' 
             },
             jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
         };
 
         try {
-            // Executamos a geração mirando no CLONE oculto, não na UI visível
-            await html2pdf().set(opt).from(cloneNode).save();
+            // 4. BATE A FOTO DA ÁREA EXPANDIDA
+            await html2pdf().set(opt).from(captureArea).save();
         } catch (e) {
             console.error('[PDF Export Erro]:', e);
             if(typeof showToast === 'function') showToast('Erro ao gerar PDF.', 'danger');
         } finally {
-            // Limpeza impecável: Destrói o clone da memória e restaura o botão
-            cloneNode.remove();
-            if(btn) btn.classList.remove('btn-is-loading');
-            _isExporting = false;
+            // 5. RESTAURA TUDO E ABRE A CORTINA
+            dialog.classList.remove('pdf-export-expanded');
+            
+            // Faz um pequeno fade-out na cortina para ficar suave
+            overlay.style.opacity = '0';
+            setTimeout(() => {
+                overlay.remove();
+                _isExporting = false;
+            }, 300);
         }
     }
 

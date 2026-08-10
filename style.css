@@ -1916,45 +1916,48 @@ button.btn-voltar.btn-dark-gold {
 }
 
 /* =============================================
-   OFF-SCREEN RENDER: EXPORTAÇÃO DE PDF ISOLADA
+   MÁSCARA DE EXPORTAÇÃO DE PDF (MASKED EXPANSION)
    ============================================= */
 
-/* Container clonado e jogado para fora da área visível */
-.offscreen-print-container {
-    position: absolute !important;
-    top: -9999px !important;
-    left: -9999px !important;
-    width: 800px !important; /* Trava a largura padrão para folha A4 */
-    max-width: none !important;
-    height: auto !important;
-    max-height: none !important;
-    overflow: visible !important;
-    background-color: var(--surface) !important; /* Fundo Creme limpo */
-    padding: 30px !important; /* Respiro do documento */
-    z-index: -9999;
-    box-shadow: none !important;
-    border: none !important;
+/* Cortina de carregamento que esconde a manipulação do layout */
+.pdf-loading-overlay {
+    position: fixed;
+    top: 0; 
+    left: 0; 
+    width: 100vw; 
+    height: 100vh;
+    background-color: var(--bg); /* Cor creme do sistema */
+    z-index: 99999;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: var(--primary);
+    opacity: 1;
+    transition: opacity 0.3s ease;
 }
 
-/* Oculta dropdowns e botões indesejados no PDF */
-.offscreen-print-container .no-print {
+/* Expansão real do modal (ocorre por trás da cortina) */
+dialog.pdf-export-expanded {
+    max-height: none !important;
+    height: auto !important;
+    overflow: visible !important;
+}
+
+dialog.pdf-export-expanded .report-dialog-body,
+dialog.pdf-export-expanded #report-catextract-scroll-area {
+    max-height: none !important;
+    height: auto !important;
+    overflow: visible !important;
+}
+
+/* Remove elementos que não devem ir pro PDF (ex: Seleção de Categoria) */
+dialog.pdf-export-expanded .no-print {
     display: none !important;
 }
 
-/* Garante que a lista se expanda completamente */
-.offscreen-print-container .cat-tx-list {
-    display: block !important;
-    height: auto !important;
-    overflow: visible !important;
-}
-
-/* 
-   Impede que a quebra de página corte um lançamento ao meio 
-   Compatibilidade cross-browser para impressão/PDF 
-*/
-.offscreen-print-container .cat-tx-item {
+/* Protege os cards para não cortarem no meio entre uma página e outra */
+.cat-tx-item {
     page-break-inside: avoid;
     break-inside: avoid;
-    box-shadow: none; /* Removemos sombras para o PDF parecer "papel" */
-    border-color: rgba(201, 168, 76, 0.4);
 }
