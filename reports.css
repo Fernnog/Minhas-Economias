@@ -780,23 +780,22 @@
 }
 .report-launcher-catextract .report-card-icon { color: #10B981; }
 
-/* Controles de Renderização de Impressão PDF (Corrigido) */
-.pdf-exporting-state #report-catextract-scroll-area {
-    max-height: none !important;
-    height: auto !important;
-    overflow: visible !important;
-    padding: 20px 10px !important; 
-    background-color: #FAF7F2 !important; /* Fundo sólido forçado (Creme da paleta) */
+/* Container off-screen para renderização do PDF (Extrato por Categoria) */
+#offscreen-print-container {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 800px; /* largura fixa para layout consistente entre dispositivos */
+    height: auto;
+    background-color: var(--surface);
+    z-index: 10; /* sempre atrás da cortina .pdf-loading-overlay (z-index 99999) */
 }
 
-.pdf-exporting-state .no-print {
-    display: none !important;
-}
-
-/* Proteção de quebra de página: impede que um lançamento seja cortado ao meio no PDF */
-.pdf-exporting-state .cat-tx-item {
+/* Proteção contra corte de card entre páginas */
+#offscreen-print-container .cat-tx-item {
     page-break-inside: avoid;
     break-inside: avoid;
+    margin-bottom: 8px;
 }
 
 .btn-is-loading {

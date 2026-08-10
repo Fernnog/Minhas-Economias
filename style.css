@@ -1937,25 +1937,6 @@ button.btn-voltar.btn-dark-gold {
     transition: opacity 0.3s ease;
 }
 
-/* Expansão real do modal (ocorre por trás da cortina) */
-dialog.pdf-export-expanded {
-    max-height: none !important;
-    height: auto !important;
-    overflow: visible !important;
-}
-
-dialog.pdf-export-expanded .report-dialog-body,
-dialog.pdf-export-expanded #report-catextract-scroll-area {
-    max-height: none !important;
-    height: auto !important;
-    overflow: visible !important;
-}
-
-/* Remove elementos que não devem ir pro PDF (ex: Seleção de Categoria) */
-dialog.pdf-export-expanded .no-print {
-    display: none !important;
-}
-
 /* Protege os cards para não cortarem no meio entre uma página e outra */
 .cat-tx-item {
     page-break-inside: avoid;

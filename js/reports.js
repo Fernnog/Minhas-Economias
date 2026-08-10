@@ -1094,60 +1094,93 @@ const ReportsModule = (function () {
     }
 
     async function exportCategoryExtractToPDF() {
-        if (_isExporting) return; 
-        
+        if (_isExporting) return;
+
         if (!_catExtractState.category) {
-            if(typeof showToast === 'function') showToast('Selecione uma categoria antes de exportar.', 'warning');
+            if (typeof showToast === 'function') showToast('Selecione uma categoria antes de exportar.', 'warning');
             return;
         }
-
         _isExporting = true;
-        const dialog = document.getElementById('report-catextract-dialog');
-        const captureArea = document.getElementById('report-catextract-scroll-area');
-        
-        // 1. FECHA A CORTINA (Mostra o overlay de Loading cobrindo a tela toda)
+
+        // 1. FECHA A CORTINA (esconde a manipulação de DOM do usuário)
         const overlay = document.createElement('div');
         overlay.className = 'pdf-loading-overlay';
+        overlay.setAttribute('role', 'status');
+        overlay.setAttribute('aria-live', 'polite');
         overlay.innerHTML = `
             <svg class="spin-icon" viewBox="0 0 24 24" width="50" height="50" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M21 12a9 9 0 1 1-6.219-8.56"></path>
             </svg>
-            <p style="margin-top:1rem; font-weight:700; font-size:1.1rem; color:var(--text);">Preparando Relatório...</p>
+            <p style="margin-top:1rem; font-weight:700; font-size:1.1rem; color:var(--text);">Preparando Relatório Completo...</p>
         `;
         document.body.appendChild(overlay);
 
-        // 2. EXPANDIR O MODAL POR TRÁS DA CORTINA
-        dialog.classList.add('pdf-export-expanded');
-
-        // Aguarda o navegador redesenhar a tela (agora com tamanho total)
-        await new Promise(resolve => setTimeout(resolve, 200));
-
-        // 3. CONFIGURAÇÕES DO PDF
-        const opt = {
-            margin:       15,
-            filename:     `Extrato_${_catExtractState.category.replace(/[^a-z0-9]/gi, '_')}_${_catExtractState.year}_${String(_catExtractState.month + 1).padStart(2, '0')}.pdf`,
-            image:        { type: 'jpeg', quality: 0.98 },
-            pagebreak:    { mode: ['avoid-all', 'css', 'legacy'] }, // Evita rasgar cards no meio da folha
-            html2canvas:  { 
-                scale: 2, 
-                useCORS: true,
-                scrollY: 0,
-                backgroundColor: '#FAF7F2' 
-            },
-            jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
-        };
+        // Referência do container off-screen. Declarada aqui para ficar
+        // acessível no finally, garantindo remoção mesmo em caso de erro.
+        let printContainer = null;
 
         try {
-            // 4. BATE A FOTO DA ÁREA EXPANDIDA
-            await html2pdf().set(opt).from(captureArea).save();
+            // 2. CRIAÇÃO DO CONTAINER VIRTUAL (OFF-SCREEN)
+            printContainer = document.createElement('div');
+            printContainer.id = 'offscreen-print-container';
+
+            // Clona apenas os dados (sem o <select> de categoria, que já não
+            // está dentro de #report-catextract-content)
+            const originalContent = document.getElementById('report-catextract-content').cloneNode(true);
+
+            // CORREÇÃO: remove o id duplicado do clone para não deixar dois
+            // elementos com o mesmo id no documento durante a exportação
+            originalContent.removeAttribute('id');
+
+            const titleMonth = document.getElementById('cat-extract-ui-month').textContent;
+            const titleCat = document.getElementById('cat-extract-ui-cat').textContent;
+
+            printContainer.innerHTML = `
+                <div style="padding: 30px; font-family: 'DM Sans', sans-serif;">
+                    <div style="text-align: center; border-bottom: 2px solid var(--primary); margin-bottom: 20px; padding-bottom: 15px;">
+                        <h2 style="margin: 0; font-size: 1.6rem; color: var(--primary); font-family: 'Playfair Display', serif;">Extrato Detalhado por Categoria</h2>
+                        <p style="margin: 8px 0 0; font-size: 1.2rem; font-weight: 700; color: var(--text);">${titleCat}</p>
+                        <p style="margin: 5px 0 0; font-size: 0.9rem; color: var(--text-light); text-transform: uppercase;">${titleMonth}</p>
+                    </div>
+                    <div id="print-data-wrapper"></div>
+                </div>
+            `;
+
+            printContainer.querySelector('#print-data-wrapper').appendChild(originalContent);
+            document.body.appendChild(printContainer);
+
+            // Aguarda o navegador processar layout/CSS do novo elemento
+            await new Promise(resolve => setTimeout(resolve, 150));
+
+            // 3. CONFIGURAÇÕES DO PDF
+            const opt = {
+                margin:       [10, 10, 15, 10], // top, left, bottom, right
+                filename:     `Extrato_${_catExtractState.category.replace(/[^a-z0-9]/gi, '_')}_${_catExtractState.year}_${String(_catExtractState.month + 1).padStart(2, '0')}.pdf`,
+                image:        { type: 'jpeg', quality: 1 },
+                pagebreak:    { mode: ['avoid-all', 'css', 'legacy'] }, // evita rasgar cards no meio da folha
+                html2canvas:  {
+                    scale: 2,
+                    useCORS: true,
+                    windowWidth: 800 // largura fixa para consistência entre celular e desktop
+                },
+                jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+            };
+
+            // 4. GERA O PDF A PARTIR DA ÁREA VIRTUAL
+            await html2pdf().set(opt).from(printContainer).save();
+
         } catch (e) {
             console.error('[PDF Export Erro]:', e);
-            if(typeof showToast === 'function') showToast('Erro ao gerar PDF.', 'danger');
+            if (typeof showToast === 'function') showToast('Erro ao gerar PDF.', 'danger');
         } finally {
-            // 5. RESTAURA TUDO E ABRE A CORTINA
-            dialog.classList.remove('pdf-export-expanded');
-            
-            // Faz um pequeno fade-out na cortina para ficar suave
+            // 5. LIMPEZA GARANTIDA (roda sempre, mesmo em erro)
+            // CORREÇÃO: remoção do container movida para o finally para
+            // evitar vazamento de nó DOM e ids duplicados em falhas futuras
+            if (printContainer && printContainer.parentNode) {
+                document.body.removeChild(printContainer);
+            }
+
+            // 6. ABRE A CORTINA
             overlay.style.opacity = '0';
             setTimeout(() => {
                 overlay.remove();
