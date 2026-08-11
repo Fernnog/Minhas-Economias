@@ -1,6 +1,9 @@
 const BudgetModule = (function() {
     let rawBudgets = JSON.parse(localStorage.getItem('fin_budgets'));
     let budgetLimits = Array.isArray(rawBudgets) ? rawBudgets : [];
+    
+    // Retenção de estado de UI para grupos expandidos/colapsados
+    const expandedGroups = new Set();
 
     // Migração: Converte dados antigos para a nova estrutura
     if (rawBudgets && !Array.isArray(rawBudgets)) {
@@ -28,6 +31,116 @@ const BudgetModule = (function() {
         
         // 1. Estado Base (Mês Civil de Calendário)
         let spent = monthlyExpenses[budget.category] || 0;
+        let rawPercent = budget.amount > 0 ? (spent / budget.amount) * 100 : (spent > 0 ? 100 : 0);
+        let displayPercent = Math.min(rawPercent, 100);
+        
+        const hoje = new Date();
+        const currentYearMonth = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}`;
+        let isMesCorrente = true;
+        
+        // Determina a data de referência baseando-se no picker do orçamento
+        const picker = document.getElementById('budget-month-picker');
+        let referenceDate = new Date();
+        if (picker && picker.value) {
+            const [y, m] = picker.value.split('-');
+            isMesCorrente = (picker.value === currentYearMonth);
+            referenceDate = isMesCorrente ? new Date() : new Date(parseInt(y), parseInt(m) - 1, 15);
+        }
+        
+        const diasNoMes = new Date(referenceDate.getFullYear(), referenceDate.getMonth() + 1, 0).getDate();
+        let tempoPercorrido = isMesCorrente ? Math.min((hoje.getDate() / diasNoMes) * 100, 100) : null;
+        let isPacingActive = (budget.amount > 0 && isMesCorrente);
+        let cycleInfoHTML = "";
+
+        // Inicializa as variáveis de pacing herdando os valores padrão do calendário
+        let pacingPercent = displayPercent;
+        let pacingStatus = rawPercent > 100 ? 'status-danger' : (rawPercent >= 50 ? 'status-warning' : 'status-ok');
+
+        // 2. Interceptação do Projetor (Monitoramento do Ciclo do Cartão)
+        if (typeof BudgetProjectorModule !== 'undefined' && typeof BudgetProjectorModule.getProjectorData === 'function') {
+            const projData = BudgetProjectorModule.getProjectorData(budget.category, referenceDate);
+            
+            if (projData && projData.isTracked) {
+                const pickerMes = referenceDate.getMonth();
+                
+                if (projData.targetMonth === pickerMes) {
+                    tempoPercorrido = projData.timePct; 
+                    isPacingActive = isMesCorrente;
+                    cycleInfoHTML = `<span class="cycle-badge" style="margin-left:8px;" title="Período do ciclo: ${projData.cycleLabel}">(Ciclo: ${projData.cycleLabel})</span>`;
+                    
+                    pacingStatus = 'status-ok';
+                    if (rawPercent > 100) pacingStatus = 'status-danger';
+                    else if (isPacingActive && rawPercent > (tempoPercorrido + 10)) pacingStatus = 'status-warning';
+                    else if (!isPacingActive && rawPercent >= 50) pacingStatus = 'status-warning';
+                }
+            }
+        }
+
+        // 3. Métricas de Exibição Textual (Estritamente baseadas no Mês Civil)
+        const remaining = budget.amount - spent;
+        let textStatus = rawPercent > 100 ? 'status-danger' : (rawPercent >= 50 ? 'status-warning' : 'status-ok');
+        const isPinned = currentPinned.includes(budget.category);
+
+        const pacingHTML = isPacingActive ? `
+            <div class="pace-indicator" title="Ritmo: Tempo vs Consumo do Cartão">
+                <div class="pace-track">
+                    <div class="pace-time-bar" style="width: ${tempoPercorrido}%;"></div>
+                    <div class="pace-spend-bar ${pacingStatus}" style="width: ${pacingPercent}%;"></div>
+                </div>
+                <div class="pace-labels" style="margin-bottom: 0.2rem;">
+                    <span>⏱ ${tempoPercorrido.toFixed(0)}% do tempo da fatura</span>
+                    <span>💸 ${rawPercent.toFixed(0)}% consumido</span>
+                </div>
+            </div>` : `
+            <div class="progress-track">
+                <div class="progress-fill ${textStatus}" style="width:${displayPercent}%;"></div>
+            </div>`;
+
+        const microCopy = budget.amount > 0
+            ? (rawPercent > 100
+                ? `<span class="budget-micro-copy danger-text">⚠ Orçamento excedido</span>`
+                : rawPercent === 100
+                ? `<span class="budget-micro-copy danger-text">⚠ Orçamento esgotado</span>`
+                : rawPercent >= 50
+                ? `<span class="budget-micro-copy warning-text">${fmt(remaining)} restante — atenção</span>`
+                : `<span class="budget-micro-copy">${fmt(remaining)} disponível</span>`)
+            : `<span class="budget-micro-copy">Sem meta — apenas registrando gastos</span>`;
+
+        return `
+            <div class="budget-row">
+                <div class="budget-meta-header">
+                    <div class="budget-meta-info">
+                        <strong style="display:flex;align-items:center;gap:0.3rem;">
+                            ${STATUS_ICONS[textStatus]}
+                            ${budget.category}
+                            <small style="font-weight:400;">${budget.type === 'mensal' ? '(Recorrente)' : '(Este mês)'}</small>
+                            ${cycleInfoHTML}
+                        </strong>
+                        <span style="font-size:0.9rem;font-weight:500;color:var(--text-light);">
+                            ${fmt(spent)} / ${fmt(budget.amount)}
+                        </span>
+                    </div>
+                    <div class="actions">
+                        <button onclick="BudgetModule.togglePin('${budget.category}')"
+                                title="${isPinned ? 'Remover do Painel' : 'Fixar no Painel'}"
+                                class="btn-pin ${isPinned ? 'pinned' : ''}">
+                            <svg viewBox="0 0 24 24" width="16" height="16" fill="${isPinned ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+                                <circle cx="12" cy="10" r="3"></circle>
+                            </svg>
+                        </button>
+                        <button onclick="BudgetModule.edit('${budget.id}')" title="Editar">
+                            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                        </button>
+                        <button onclick="BudgetModule.remove('${budget.id}')" title="Excluir">
+                            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="var(--danger)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                        </button>
+                    </div>
+                </div>
+                ${pacingHTML}
+                ${microCopy}
+            </div>`;
+    }
         let percent = Math.min((spent / budget.amount) * 100, 100);
         
         const hoje = new Date();
@@ -174,10 +287,10 @@ const BudgetModule = (function() {
             const groupStatus   = groupPct > 90 ? 'status-danger' : (groupPct > 70 ? 'status-warning' : 'status-ok');
             const color         = entry.parent.color;
 
-            // Lógica de colapso automático (Prioridade 2)
-            const isOk = groupStatus === 'status-ok';
-            const displayStyle = isOk ? 'display: none;' : 'display: block;';
-            const chevronRot = isOk ? 'transform: rotate(-90deg);' : 'transform: rotate(0deg);';
+            // Lógica de colapso baseada no estado de memória da UI
+            const isOpen = expandedGroups.has(g.id);
+            const displayStyle = isOpen ? 'display: block;' : 'display: none;';
+            const chevronRot = isOpen ? 'transform: rotate(0deg);' : 'transform: rotate(-90deg);';
 
             html += `
                 <div class="budget-group-section">
@@ -213,9 +326,9 @@ const BudgetModule = (function() {
             const groupPct      = totalBudgeted > 0 ? Math.min((totalSpent / totalBudgeted) * 100, 100) : 0;
             const groupStatus   = groupPct > 90 ? 'status-danger' : (groupPct > 70 ? 'status-warning' : 'status-ok');
 
-            const isOk = groupStatus === 'status-ok';
-            const displayStyle = isOk ? 'display: none;' : 'display: block;';
-            const chevronRot = isOk ? 'transform: rotate(-90deg);' : 'transform: rotate(0deg);';
+            const isOpen = expandedGroups.has('ungrouped');
+            const displayStyle = isOpen ? 'display: block;' : 'display: none;';
+            const chevronRot = isOpen ? 'transform: rotate(0deg);' : 'transform: rotate(-90deg);';
 
             html += `
                 <div class="budget-group-section">
@@ -255,9 +368,11 @@ const BudgetModule = (function() {
         if (items.style.display === 'none') {
             items.style.display = 'block';
             chevron.style.transform = 'rotate(0deg)';
+            expandedGroups.add(groupId);
         } else {
             items.style.display = 'none';
             chevron.style.transform = 'rotate(-90deg)';
+            expandedGroups.delete(groupId);
         }
     }
 
