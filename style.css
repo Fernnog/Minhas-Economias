@@ -1070,6 +1070,49 @@ dialog::backdrop { background: rgba(15, 23, 42, 0.5); backdrop-filter: blur(4px)
 
 .day-balance-row span.despesa { color: var(--danger); }
 
+/* --- EXTENSÃO: CONFERÊNCIA EM LOTE --- */
+.day-header-content {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.6rem 1rem;
+}
+
+.btn-confirm-day {
+    background: transparent;
+    border: none;
+    color: #94A3B8; /* Slate 400 - Discreto */
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+}
+
+.btn-confirm-day:hover:not(:disabled) {
+    color: var(--primary);
+    background: rgba(201, 168, 76, 0.15);
+    transform: scale(1.05);
+}
+
+.btn-confirm-day:active:not(:disabled) {
+    transform: scale(0.95);
+}
+
+.btn-confirm-day.is-all-confirmed {
+    color: var(--primary);
+}
+
+/* Estado de segurança: Desabilitado quando há filtros ativos */
+.btn-confirm-day:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+    background: transparent;
+    color: #94A3B8;
+}
+
 /* === CONFERÊNCIA DE LANÇAMENTOS === */
 
 /* Span clicável do nome do lançamento */

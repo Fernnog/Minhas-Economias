@@ -9,6 +9,7 @@ const ExtractModule = (function() {
     let searchQuery = ''; 
     let searchDebounce = null; // Controle anti-travamento para digitação rápida
     let confirmedItems = JSON.parse(localStorage.getItem('fin_confirmed_items') || '{}');
+    let currentRenderedGroups = {}; // Guarda a estrutura de dias para a conferência em lote
 
     function _saveConfirmed() {
         localStorage.setItem('fin_confirmed_items', JSON.stringify(confirmedItems));
@@ -34,6 +35,46 @@ const ExtractModule = (function() {
         }
 
         render();
+    };
+
+    // Função para conferência em lote baseada no dia
+    window.toggleDayConfirmation = function(date) {
+        const group = currentRenderedGroups[date];
+        if (!group || !group.items) return;
+
+        // Se a tela estiver filtrada, a própria UI desabilita o botão.
+        // Aqui temos uma dupla validação (Backend/Frontend lock)
+        if (searchQuery !== '' || filterMode !== 0) {
+            showToast('Limpe a busca e os filtros para conferir o dia inteiro.', 'warning');
+            return;
+        }
+
+        const allConfirmed = group.items.every(t => !!confirmedItems[_confirmKey(t.id, t.date)]);
+        let changed = false;
+
+        group.items.forEach(t => {
+            const key = _confirmKey(t.id, t.date);
+            if (allConfirmed) {
+                if (confirmedItems[key]) {
+                    delete confirmedItems[key];
+                    changed = true;
+                }
+            } else {
+                if (!confirmedItems[key]) {
+                    confirmedItems[key] = true;
+                    changed = true;
+                }
+            }
+        });
+
+        if (changed) {
+            _saveConfirmed();
+            // Network Optimization: Sincroniza o dicionário inteiro na nuvem uma única vez
+            if (typeof FirebaseModule !== 'undefined') {
+                FirebaseModule.syncData('preferences', { id: 'confirmed_items', items: confirmedItems });
+            }
+            render();
+        }
     };
 
     // Cicla entre os 3 modos de filtro e atualiza o visual do botão
@@ -322,21 +363,60 @@ const ExtractModule = (function() {
             return;
         }
 
+        // NOVO: Verifica se há algum filtro ativo que quebre a integridade visual do dia
+        const isListFiltered = searchQuery !== '' || filterMode !== 0;
+        
+        // NOVO: Array acumulador para evitar DOM Thrashing (Performance)
+        let htmlBuffer = [];
+
         Object.keys(groups).sort((a, b) => new Date(b) - new Date(a)).forEach(date => {
             const group = groups[date];
             const dateLabel = new Date(date + 'T00:00:00').toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: 'short' }).toUpperCase();
-
-            // Extrai o dia para o data-attribute ignorando fuso horário
             const diaStr = date.split('-')[2];
-            list.innerHTML += `<tr class="day-group-header" data-day="${diaStr}"><td colspan="3">${dateLabel}</td></tr>`;
 
+            // Lógica do Lote e UX
+            const allConfirmed = group.items.length > 0 && group.items.every(t => !!confirmedItems[_confirmKey(t.id, t.date)]);
+            
+            // Reaproveitamento da constante global _checkSvg existente no arquivo
+            const iconSvg = allConfirmed 
+                ? `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="var(--primary)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>` 
+                : `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>`;
+            
+            const activeClass = allConfirmed ? 'is-all-confirmed' : '';
+            
+            // Trava de Segurança (Bloqueia o botão se a lista estiver filtrada)
+            const disabledAttr = isListFiltered ? 'disabled' : '';
+            const btnTitle = isListFiltered 
+                ? 'Limpe a busca/filtros para conferir em lote' 
+                : (allConfirmed ? 'Desmarcar todos deste dia' : 'Conferir todos deste dia');
+
+            // Renderiza o cabeçalho do dia
+            htmlBuffer.push(`
+                <tr class="day-group-header" data-day="${diaStr}">
+                    <td colspan="3" style="padding: 0;">
+                        <div class="day-header-content">
+                            <span>${dateLabel}</span>
+                            <button class="btn-confirm-day ${activeClass}" 
+                                    onclick="toggleDayConfirmation('${date}')" 
+                                    title="${btnTitle}"
+                                    aria-label="${btnTitle}"
+                                    aria-pressed="${allConfirmed}"
+                                    ${disabledAttr}>
+                                ${iconSvg}
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+            `);
+
+            // Renderiza os itens do dia
             group.items.forEach(t => {
                 const isVirtual = t.id.includes('_proj');
                 const isConf = !!confirmedItems[_confirmKey(t.id, t.date)];
                 const confClass = isConf ? 'confirmed' : '';
                 const confTitle = isConf ? 'Clique para desmarcar como conferido' : 'Clique para marcar como conferido';
 
-                list.innerHTML += `
+                htmlBuffer.push(`
                     <tr class="extract-row ${confClass}">
                         <td>
                             <div class="extract-info">
@@ -372,16 +452,23 @@ const ExtractModule = (function() {
                             </button>
                             `}
                         </td>
-                    </tr>`;
+                    </tr>
+                `);
             });
 
+            // Renderiza o saldo do dia
             if (!searchQuery) {
-                list.innerHTML += `
+                htmlBuffer.push(`
                     <tr class="day-balance-row">
                         <td colspan="3">Saldo do dia: <span class="${group.dayBalance < 0 ? 'despesa' : ''}">${group.dayBalance.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span></td>
-                    </tr>`;
+                    </tr>
+                `);
             }
         });
+
+        // NOVO: Injeta todo o HTML gerado de uma única vez no DOM
+        list.innerHTML = htmlBuffer.join('');
+        currentRenderedGroups = groups; // Salva o estado para a função de lote
 
         // NOVO: Força um evento de scroll falso para recalcular botões após remontar a lista
         setTimeout(() => window.dispatchEvent(new Event('scroll')), 100);
