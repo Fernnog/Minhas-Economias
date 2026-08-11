@@ -780,23 +780,7 @@
 }
 .report-launcher-catextract .report-card-icon { color: #10B981; }
 
-/* Container off-screen para renderização do PDF (Extrato por Categoria) */
-#offscreen-print-container {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 800px; /* largura fixa para layout consistente entre dispositivos */
-    height: auto;
-    background-color: var(--surface);
-    z-index: 10; /* sempre atrás da cortina .pdf-loading-overlay (z-index 99999) */
-}
-
-/* Proteção contra corte de card entre páginas */
-#offscreen-print-container .cat-tx-item {
-    page-break-inside: avoid;
-    break-inside: avoid;
-    margin-bottom: 8px;
-}
+/* Container off-screen para renderização do PDF removido - Geração agora é Vetorial nativa */
 
 .btn-is-loading {
     pointer-events: none;

@@ -934,6 +934,44 @@ const ReportsModule = (function () {
     // EXTRATO POR CATEGORIA (Novo Hub V2)
     // ===================================================
     
+    // Helper de Negócios: Fonte Única da Verdade para extração de categoria
+    function _getFilteredCategoryData(category, year, month) {
+        const txns = _getTxns();
+        const filtered = [];
+        const monthStr = `${year}-${String(month + 1).padStart(2, '0')}`;
+
+        txns.forEach(t => {
+            if (t.category !== category) return;
+            
+            const d = new Date(t.date + 'T00:00:00');
+            const tYear = d.getFullYear();
+            const tMonth = d.getMonth();
+            let isActive = false;
+            let isProjected = false;
+
+            if (tYear === year && tMonth === month) {
+                isActive = true;
+            } else if (t.isRecurring && (tYear < year || (tYear === year && tMonth < month))) {
+                const isSkipped = t.skippedDates && t.skippedDates.some(sd => sd.startsWith(monthStr));
+                const fim = t.recurrenceEndDate ? new Date(t.recurrenceEndDate) : null;
+                if (!isSkipped && (!fim || new Date(year, month, 1) < fim)) {
+                    isActive = true;
+                    isProjected = true;
+                }
+            }
+
+            if (isActive) {
+                const projectedDate = isProjected ? `${monthStr}-${t.date.slice(8, 10)}` : t.date;
+                filtered.push({ ...t, date: projectedDate, isProjected });
+            }
+        });
+
+        filtered.sort((a, b) => new Date(a.date) - new Date(b.date));
+        const total = filtered.reduce((acc, t) => acc + (t.type === 'despesa' ? -t.amount : t.amount), 0);
+
+        return { filtered, total };
+    }
+
     let _catExtractState = { year: null, month: null, category: '' };
     let _isExporting = false;
 
@@ -1028,45 +1066,14 @@ const ReportsModule = (function () {
             return;
         }
 
-        const txns = _getTxns();
-        const filtered = [];
-        const { year, month, category } = _catExtractState;
-        const monthStr = `${year}-${String(month + 1).padStart(2, '0')}`;
-
-        txns.forEach(t => {
-            if (t.category !== category) return;
-            
-            const d = new Date(t.date + 'T00:00:00');
-            const tYear = d.getFullYear();
-            const tMonth = d.getMonth();
-            let isActive = false;
-            let isProjected = false;
-
-            if (tYear === year && tMonth === month) {
-                isActive = true;
-            } else if (t.isRecurring && (tYear < year || (tYear === year && tMonth < month))) {
-                const isSkipped = t.skippedDates && t.skippedDates.some(sd => sd.startsWith(monthStr));
-                const fim = t.recurrenceEndDate ? new Date(t.recurrenceEndDate) : null;
-                if (!isSkipped && (!fim || new Date(year, month, 1) < fim)) {
-                    isActive = true;
-                    isProjected = true;
-                }
-            }
-
-            if (isActive) {
-                const projectedDate = isProjected ? `${monthStr}-${t.date.slice(8, 10)}` : t.date;
-                filtered.push({ ...t, date: projectedDate, isProjected });
-            }
-        });
-
-        filtered.sort((a, b) => new Date(a.date) - new Date(b.date));
+        // NOVO: Usa a fonte única da verdade
+        const { filtered, total } = _getFilteredCategoryData(_catExtractState.category, _catExtractState.year, _catExtractState.month);
 
         if (filtered.length === 0) {
-            content.innerHTML = `<p class="report-empty" style="color:var(--text-light);">Nenhum registro encontrado para <strong>${category}</strong> em ${titleMonth.textContent}.</p>`;
+            content.innerHTML = `<p class="report-empty" style="color:var(--text-light);">Nenhum registro encontrado para <strong>${_catExtractState.category}</strong> em ${titleMonth.textContent}.</p>`;
             return;
         }
 
-        let total = filtered.reduce((acc, t) => acc + (t.type === 'despesa' ? -t.amount : t.amount), 0);
         const colorClass = total < 0 ? 'var(--danger)' : 'var(--success)';
 
         content.innerHTML = `
@@ -1093,6 +1100,14 @@ const ReportsModule = (function () {
             </ul>`;
     }
 
+    // Helper para converter cor HEX das variáveis CSS para RGB pro jsPDF
+    function _hexToRgb(hex) {
+        hex = hex.replace('#', '');
+        if (hex.length === 3) hex = hex.split('').map(c => c + c).join('');
+        const num = parseInt(hex, 16);
+        return [num >> 16, (num >> 8) & 255, num & 255];
+    }
+
     async function exportCategoryExtractToPDF() {
         if (_isExporting) return;
 
@@ -1102,88 +1117,173 @@ const ReportsModule = (function () {
         }
         _isExporting = true;
 
-        // 1. FECHA A CORTINA (esconde a manipulação de DOM do usuário)
         const overlay = document.createElement('div');
         overlay.className = 'pdf-loading-overlay';
-        overlay.setAttribute('role', 'status');
-        overlay.setAttribute('aria-live', 'polite');
         overlay.innerHTML = `
             <svg class="spin-icon" viewBox="0 0 24 24" width="50" height="50" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M21 12a9 9 0 1 1-6.219-8.56"></path>
             </svg>
-            <p style="margin-top:1rem; font-weight:700; font-size:1.1rem; color:var(--text);">Preparando Relatório Completo...</p>
+            <p style="margin-top:1rem; font-weight:700; font-size:1.1rem; color:var(--text);">Gerando Relatório Vetorial...</p>
         `;
         document.body.appendChild(overlay);
 
-        // Referência do container off-screen. Declarada aqui para ficar
-        // acessível no finally, garantindo remoção mesmo em caso de erro.
-        let printContainer = null;
+        // Dá tempo para a UI renderizar o overlay
+        await new Promise(r => setTimeout(r, 50));
 
         try {
-            // 2. CRIAÇÃO DO CONTAINER VIRTUAL (OFF-SCREEN)
-            printContainer = document.createElement('div');
-            printContainer.id = 'offscreen-print-container';
+            const { year, month, category } = _catExtractState;
+            const { filtered, total } = _getFilteredCategoryData(category, year, month);
 
-            // Clona apenas os dados (sem o <select> de categoria, que já não
-            // está dentro de #report-catextract-content)
-            const originalContent = document.getElementById('report-catextract-content').cloneNode(true);
+            const JsPDF = window.jspdf ? window.jspdf.jsPDF : window.jsPDF;
+            const doc = new JsPDF('p', 'mm', 'a4');
+            const pageWidth = doc.internal.pageSize.getWidth();
+            const pageHeight = doc.internal.pageSize.getHeight();
+            let y = 20;
 
-            // CORREÇÃO: remove o id duplicado do clone para não deixar dois
-            // elementos com o mesmo id no documento durante a exportação
-            originalContent.removeAttribute('id');
+            // Extração Dinâmica de Cores do CSS
+            const rootStyles = getComputedStyle(document.documentElement);
+            const cPrimary = _hexToRgb(rootStyles.getPropertyValue('--primary').trim() || '#C9A84C');
+            const cText = _hexToRgb(rootStyles.getPropertyValue('--text').trim() || '#1C1A17');
+            const cTextLight = _hexToRgb(rootStyles.getPropertyValue('--text-light').trim() || '#6B6150');
+            const cDanger = _hexToRgb(rootStyles.getPropertyValue('--danger').trim() || '#E05252');
+            const cSuccess = _hexToRgb(rootStyles.getPropertyValue('--success').trim() || '#4CAF7C');
 
-            const titleMonth = document.getElementById('cat-extract-ui-month').textContent;
-            const titleCat = document.getElementById('cat-extract-ui-cat').textContent;
+            // --- CABEÇALHO DO RELATÓRIO ---
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(16);
+            doc.setTextColor(...cPrimary);
+            doc.text('Extrato Detalhado por Categoria', pageWidth / 2, y, { align: 'center' });
 
-            printContainer.innerHTML = `
-                <div style="padding: 30px; font-family: 'DM Sans', sans-serif;">
-                    <div style="text-align: center; border-bottom: 2px solid var(--primary); margin-bottom: 20px; padding-bottom: 15px;">
-                        <h2 style="margin: 0; font-size: 1.6rem; color: var(--primary); font-family: 'Playfair Display', serif;">Extrato Detalhado por Categoria</h2>
-                        <p style="margin: 8px 0 0; font-size: 1.2rem; font-weight: 700; color: var(--text);">${titleCat}</p>
-                        <p style="margin: 5px 0 0; font-size: 0.9rem; color: var(--text-light); text-transform: uppercase;">${titleMonth}</p>
-                    </div>
-                    <div id="print-data-wrapper"></div>
-                </div>
-            `;
+            y += 8;
+            doc.setFontSize(12);
+            doc.setTextColor(...cText);
+            doc.text(category, pageWidth / 2, y, { align: 'center' });
 
-            printContainer.querySelector('#print-data-wrapper').appendChild(originalContent);
-            document.body.appendChild(printContainer);
+            y += 6;
+            const mLabel = new Date(year, month, 1).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }).toUpperCase();
+            doc.setFontSize(9);
+            doc.setFont('helvetica', 'normal');
+            doc.setTextColor(...cTextLight);
+            doc.text(mLabel, pageWidth / 2, y, { align: 'center' });
 
-            // Aguarda o navegador processar layout/CSS do novo elemento
-            await new Promise(resolve => setTimeout(resolve, 150));
+            y += 8;
+            doc.setDrawColor(...cPrimary);
+            doc.setLineWidth(0.5);
+            doc.line(15, y, pageWidth - 15, y);
 
-            // 3. CONFIGURAÇÕES DO PDF
-            const opt = {
-                margin:       [10, 10, 15, 10], // top, left, bottom, right
-                filename:     `Extrato_${_catExtractState.category.replace(/[^a-z0-9]/gi, '_')}_${_catExtractState.year}_${String(_catExtractState.month + 1).padStart(2, '0')}.pdf`,
-                image:        { type: 'jpeg', quality: 1 },
-                pagebreak:    { mode: ['avoid-all', 'css', 'legacy'] }, // evita rasgar cards no meio da folha
-                html2canvas:  {
-                    scale: 2,
-                    useCORS: true,
-                    windowWidth: 800 // largura fixa para consistência entre celular e desktop
-                },
-                jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+            // --- RESUMO GERAL ---
+            y += 10;
+            doc.setFontSize(11);
+            doc.setFont('helvetica', 'bold');
+            doc.setTextColor(...cText);
+            doc.text(`${filtered.length} lançamento(s)`, 15, y);
+
+            const totalColor = total < 0 ? cDanger : cSuccess;
+            doc.setTextColor(...totalColor);
+            
+            // Sanitiza o formato de dinheiro removendo \u00A0
+            const totalStr = _fmt(Math.abs(total)).replace(/\u00A0/g, ' ');
+            const totalPrefix = total < 0 ? '- ' : '+ ';
+            doc.text(`${totalPrefix}${totalStr}`, pageWidth - 15, y, { align: 'right' });
+
+            // Helper interno para desenhar o cabeçalho da tabela
+            const drawTableHeader = (posY) => {
+                let currentY = posY + 10;
+                doc.setFontSize(8);
+                doc.setTextColor(...cTextLight);
+                doc.setFont('helvetica', 'bold');
+                doc.text('DATA', 15, currentY);
+                doc.text('DESCRIÇÃO', 45, currentY);
+                doc.text('VALOR', pageWidth - 15, currentY, { align: 'right' });
+
+                currentY += 4;
+                doc.setDrawColor(220, 220, 220);
+                doc.setLineWidth(0.2);
+                doc.line(15, currentY, pageWidth - 15, currentY);
+                return currentY + 8;
             };
 
-            // 4. GERA O PDF A PARTIR DA ÁREA VIRTUAL
-            await html2pdf().set(opt).from(printContainer).save();
+            y = drawTableHeader(y);
 
-        } catch (e) {
-            console.error('[PDF Export Erro]:', e);
-            if (typeof showToast === 'function') showToast('Erro ao gerar PDF.', 'danger');
-        } finally {
-            // 5. LIMPEZA GARANTIDA (roda sempre, mesmo em erro)
-            // CORREÇÃO: remoção do container movida para o finally para
-            // evitar vazamento de nó DOM e ids duplicados em falhas futuras
-            if (printContainer && printContainer.parentNode) {
-                document.body.removeChild(printContainer);
+            // --- ITERAÇÃO DE LINHAS (MOTOR DE PAGINAÇÃO E MULTILINHA) ---
+            doc.setFontSize(9);
+            const maxDescWidth = 105; // mm de largura para a descrição
+            const lineHeight = 5;
+
+            filtered.forEach(t => {
+                const dt = new Date(t.date + 'T00:00:00').toLocaleDateString('pt-BR');
+                
+                // Sanitização agressiva: Remove emojis e unicode exótico para evitar quebra de fonte no jsPDF
+                let rawDesc = t.desc || '—';
+                rawDesc = rawDesc.replace(/[^\x20-\x7E\xA0-\xFF]/g, ''); 
+                if (t.isProjected) rawDesc += ' (Recorrente/Projetado)';
+                
+                // Trata multilinha automaticamente
+                const descLines = doc.splitTextToSize(rawDesc, maxDescWidth);
+                const blockHeight = descLines.length * lineHeight;
+
+                // Verificação de Quebra de Página
+                if (y + blockHeight > pageHeight - 20) {
+                    doc.addPage();
+                    y = 20;
+                    y = drawTableHeader(y);
+                    doc.setFontSize(9); // restaura config de fonte
+                }
+
+                // Renderiza Data
+                doc.setFont('helvetica', 'normal');
+                doc.setTextColor(...cTextLight);
+                doc.text(dt, 15, y);
+
+                // Renderiza Descrição (pode ocupar N linhas)
+                doc.setTextColor(...cText);
+                doc.text(descLines, 45, y);
+
+                // Renderiza Valor com sinal A11y
+                const rawAmount = _fmt(t.amount).replace(/\u00A0/g, ' ');
+                const amtPrefix = t.type === 'despesa' ? '- ' : '+ ';
+                const amtColor = t.type === 'despesa' ? cDanger : cSuccess;
+                
+                doc.setFont('helvetica', 'bold');
+                doc.setTextColor(...amtColor);
+                doc.text(`${amtPrefix}${rawAmount}`, pageWidth - 15, y, { align: 'right' });
+
+                y += blockHeight + 2; // Espaçamento entre linhas dinâmico
+                
+                // Linha divisória sutil
+                doc.setDrawColor(240, 240, 240);
+                doc.setLineWidth(0.1);
+                doc.line(15, y - 1, pageWidth - 15, y - 1);
+            });
+
+            if (filtered.length === 0) {
+                doc.setFont('helvetica', 'normal');
+                doc.setTextColor(...cTextLight);
+                doc.text('Nenhum registro encontrado para este período.', pageWidth / 2, y + 10, { align: 'center' });
             }
 
-            // 6. ABRE A CORTINA
+            // --- INSERÇÃO DE NUMERAÇÃO DE PÁGINAS ---
+            const totalPages = doc.internal.getNumberOfPages();
+            for (let i = 1; i <= totalPages; i++) {
+                doc.setPage(i);
+                doc.setFontSize(7);
+                doc.setTextColor(...cTextLight);
+                doc.setFont('helvetica', 'normal');
+                doc.text(`Página ${i} de ${totalPages}`, pageWidth / 2, pageHeight - 10, { align: 'center' });
+            }
+
+            // --- SALVAR PDF ---
+            const cleanCatName = category.replace(/[^a-z0-9]/gi, '_');
+            const fileName = `Extrato_${cleanCatName}_${year}_${String(month + 1).padStart(2, '0')}.pdf`;
+            doc.save(fileName);
+
+        } catch (e) {
+            console.error('[jsPDF Export Erro]:', e);
+            if (typeof showToast === 'function') showToast('Erro ao gerar PDF vetorial.', 'danger');
+        } finally {
             overlay.style.opacity = '0';
             setTimeout(() => {
-                overlay.remove();
+                if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
                 _isExporting = false;
             }, 300);
         }
