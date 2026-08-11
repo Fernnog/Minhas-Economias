@@ -1134,8 +1134,9 @@ const ReportsModule = (function () {
             const { year, month, category } = _catExtractState;
             const { filtered, total } = _getFilteredCategoryData(category, year, month);
 
-            const JsPDF = window.jspdf ? window.jspdf.jsPDF : window.jsPDF;
-            const doc = new JsPDF('p', 'mm', 'a4');
+            // Captura a classe jsPDF instanciada via CDN UMD
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF('p', 'mm', 'a4');
             const pageWidth = doc.internal.pageSize.getWidth();
             const pageHeight = doc.internal.pageSize.getHeight();
             let y = 20;
