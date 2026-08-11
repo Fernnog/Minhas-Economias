@@ -349,14 +349,40 @@ const ExtractModule = (function() {
             ? window.calculateCumulativeBalanceUpTo(dataFimMesAnterior)
             : 0;
 
-        // --- Agrupa por data (Usa o reduce com matemática leve O(N)) ---
-        const groups = [...filtered].sort((a, b) => new Date(a.date) - new Date(b.date)).reduce((acc, t) => {
-            if (!acc[t.date]) acc[t.date] = { items: [], dayBalance: 0 };
+        const allMonthSorted = [...allMonth].sort((a, b) => a.date.localeCompare(b.date));
+        const trueDayBalances = {};
+        
+        allMonthSorted.forEach(t => {
             balance += (t.type === 'receita' ? t.amount : -t.amount);
+            trueDayBalances[t.date] = balance;
+        });
+
+        const groups = filtered.sort((a, b) => a.date.localeCompare(b.date)).reduce((acc, t) => {
+            if (!acc[t.date]) acc[t.date] = { items: [], dayBalance: trueDayBalances[t.date] ?? balance };
             acc[t.date].items.push(t);
-            acc[t.date].dayBalance = balance;
             return acc;
         }, {});
+
+        // Reintegra os dias vazios apenas se estivermos aplicando um filtro (sem busca de texto ativa)
+        if (filterMode !== 0 && !searchQuery) {
+            Object.keys(trueDayBalances).forEach(date => {
+                if (!groups[date]) groups[date] = { items: [], dayBalance: trueDayBalances[date] ?? balance };
+            });
+
+            // Lógica de subtotalizador aplicada diretamente ao reportContainer já instanciado acima
+            const filterSum = filtered.reduce((s, t) => s + (t.type === 'receita' ? t.amount : -t.amount), 0);
+            const formattedTotal = Math.abs(filterSum).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+            const colorClass = filterSum >= 0 ? 'var(--success)' : 'var(--danger)';
+            if (reportContainer) {
+                reportContainer.innerHTML = `
+                    <div class="search-mini-report">
+                        <span>📊 <strong>${filtered.length}</strong> visíveis no filtro</span>
+                        <span style="color: ${colorClass};">${filterSum < 0 ? '-' : ''}${formattedTotal}</span>
+                    </div>
+                `;
+                reportContainer.classList.remove('hidden');
+            }
+        }
 
         if (Object.keys(groups).length === 0) {
             list.innerHTML = `<tr><td colspan="3" style="text-align:center;padding:2rem;color:var(--text-light);font-size:0.9rem;">Nenhum lançamento para exibir.</td></tr>`;
@@ -458,9 +484,21 @@ const ExtractModule = (function() {
 
             // Renderiza o saldo do dia
             if (!searchQuery) {
+                const tooltipHtml = isListFiltered 
+                    ? `<span title="Saldo real da conta neste dia, independente dos filtros ativos." style="cursor:help; margin-left:5px;">ℹ️</span>` 
+                    : '';
+                
+                if (group.items.length === 0) {
+                    htmlBuffer.push(`
+                        <tr class="extract-row">
+                            <td colspan="3" style="text-align:center; color:var(--text-light); font-size:0.85rem;">Nenhum lançamento pendente/conferido neste dia.</td>
+                        </tr>
+                    `);
+                }
+
                 htmlBuffer.push(`
                     <tr class="day-balance-row">
-                        <td colspan="3">Saldo do dia: <span class="${group.dayBalance < 0 ? 'despesa' : ''}">${group.dayBalance.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span></td>
+                        <td colspan="3">Saldo do dia: <span class="${group.dayBalance < 0 ? 'despesa' : ''}">${group.dayBalance.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>${tooltipHtml}</td>
                     </tr>
                 `);
             }
