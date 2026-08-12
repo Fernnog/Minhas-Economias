@@ -189,6 +189,20 @@ let dashboardMonthOffset = 0;
 // Estado independente do gráfico de categorias (null = segue o painel)
 let _chartMonth = null; // { year, month } ou null
 
+/**
+ * Expõe o contexto de data atual do gráfico de categorias de forma atômica
+ * para o módulo de relatórios consumir a fonte da verdade correta.
+ */
+window.getChartContext = function() {
+    if (_chartMonth !== null) {
+        return _chartMonth;
+    }
+    // Fallback: Mês atual em visualização global (Dashboard)
+    const hoje = new Date();
+    const dataVisualizada = new Date(hoje.getFullYear(), hoje.getMonth() + (typeof dashboardMonthOffset !== 'undefined' ? dashboardMonthOffset : 0), 1);
+    return { year: dataVisualizada.getFullYear(), month: dataVisualizada.getMonth() };
+};
+
 // === TOAST DELEGATION ===
 // Mantém compatibilidade com chamadas legadas delegando para o módulo central
 window.showToast = function(message) {

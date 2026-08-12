@@ -1295,41 +1295,173 @@ const ReportsModule = (function () {
     // ===================================================
     async function exportPanelToPDF() {
         const btn = document.getElementById('btn-export-pdf');
-        if(btn) btn.style.opacity = '0.5'; // Feedback visual UX
-        
-        const panel = document.querySelector('.chart-card');
-        if(!panel) return;
-        
-        // Preparação: Expandir subcategorias ocultas
-        const collapsedChildren = panel.querySelectorAll('.bar-row-child.hidden');
-        collapsedChildren.forEach(el => el.classList.remove('hidden'));
-        
-        // Preparação: Estilo de folha A4 e injeção do cabeçalho
-        panel.classList.add('pdf-export-mode');
-        const header = document.createElement('div');
-        header.className = 'pdf-header';
-        header.innerHTML = `
-            <img src="imagens/android-chrome-192x192.png" alt="Logo">
-            <h2>Relatório de Despesas e Receitas</h2>
-        `;
-        panel.prepend(header);
+        if (!btn || btn.classList.contains('btn-is-loading')) return;
 
-        const opt = {
-            margin:       10,
-            filename:     `Relatorio_Categorias_${new Date().getTime()}.pdf`,
-            image:        { type: 'jpeg', quality: 1 },
-            html2canvas:  { scale: 2, useCORS: true },
-            jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
-        };
+        btn.classList.add('btn-is-loading');
+        
+        // Libera a thread principal para a GPU pintar o spinner
+        await new Promise(r => setTimeout(r, 60));
 
-        // Geração da imagem vetorial e PDF
-        await html2pdf().set(opt).from(panel).save();
+        try {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF('p', 'mm', 'a4');
+            const pageWidth = doc.internal.pageSize.getWidth();
+            const pageHeight = doc.internal.pageSize.getHeight();
+            let y = 20;
 
-        // Limpeza: Restaurar o DOM
-        header.remove();
-        panel.classList.remove('pdf-export-mode');
-        collapsedChildren.forEach(el => el.classList.add('hidden'));
-        if(btn) btn.style.opacity = '1';
+            // Utilitários de Extração
+            const rootStyles = getComputedStyle(document.documentElement);
+            const _rgb = (varName, fallback) => _hexToRgb(rootStyles.getPropertyValue(varName).trim() || fallback);
+            const cPrimary = _rgb('--primary', '#C9A84C');
+            const cText = _rgb('--text', '#1C1A17');
+            const cTextLight = _rgb('--text-light', '#6B6150');
+            const cDanger = _rgb('--danger', '#E05252');
+            const cSuccess = _rgb('--success', '#4CAF7C');
+
+            // Contexto e SSOT
+            const ctx = (typeof window.getChartContext === 'function') ? window.getChartContext() : { year: new Date().getFullYear(), month: new Date().getMonth() };
+            const gastos = typeof window.getMonthExpenses === 'function' ? window.getMonthExpenses(ctx.month, ctx.year, true) : {};
+            const receitas = typeof window.getMonthIncome === 'function' ? window.getMonthIncome(ctx.month, ctx.year) : {};
+            const useGroups = typeof CategoryGroups !== 'undefined';
+            
+            const mLabel = new Date(ctx.year, ctx.month, 1).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }).toUpperCase();
+
+            // 1. Cabeçalho
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(16);
+            doc.setTextColor(...cPrimary);
+            doc.text('Relatório Consolidado por Categoria', pageWidth / 2, y, { align: 'center' });
+
+            y += 6;
+            doc.setFontSize(10);
+            doc.setFont('helvetica', 'normal');
+            doc.setTextColor(...cTextLight);
+            doc.text(mLabel, pageWidth / 2, y, { align: 'center' });
+
+            y += 8;
+            doc.setDrawColor(...cPrimary);
+            doc.setLineWidth(0.5);
+            doc.line(15, y, pageWidth - 15, y);
+            y += 12;
+
+            // 2. Resumo de Totais
+            const totalExp = Object.values(gastos).reduce((s, v) => s + v, 0);
+            const totalInc = Object.values(receitas).reduce((s, v) => s + v, 0);
+            const saldo = totalInc - totalExp;
+
+            doc.setFontSize(8);
+            doc.setTextColor(...cTextLight);
+            doc.setFont('helvetica', 'bold');
+            doc.text('RECEITAS', 15, y);
+            doc.text('DESPESAS', pageWidth / 2, y, { align: 'center' });
+            doc.text('SALDO', pageWidth - 15, y, { align: 'right' });
+
+            y += 6;
+            doc.setFontSize(11);
+            doc.setTextColor(...cSuccess);
+            doc.text(_fmt(totalInc).replace(/\u00A0/g, ' '), 15, y);
+            
+            doc.setTextColor(...cDanger);
+            doc.text(_fmt(totalExp).replace(/\u00A0/g, ' '), pageWidth / 2, y, { align: 'center' });
+            
+            doc.setTextColor(...(saldo >= 0 ? cSuccess : cDanger));
+            doc.text(_fmt(saldo).replace(/\u00A0/g, ' '), pageWidth - 15, y, { align: 'right' });
+
+            y += 12;
+
+            const checkPageBreak = (offset = 20) => {
+                if (y > pageHeight - offset) {
+                    doc.addPage();
+                    y = 20;
+                    return true;
+                }
+                return false;
+            };
+
+            // 3. Renderização Modular de Listas (Evitando Scraping)
+            const renderItemList = (title, items, isIncome = false) => {
+                if (items.length === 0) return;
+                checkPageBreak();
+
+                doc.setFontSize(11);
+                doc.setTextColor(...cText);
+                doc.setFont('helvetica', 'bold');
+                doc.text(title, 15, y);
+                y += 2;
+                doc.setDrawColor(220, 220, 220);
+                doc.setLineWidth(0.2);
+                doc.line(15, y, pageWidth - 15, y);
+                y += 6;
+
+                items.forEach(item => {
+                    checkPageBreak(15);
+                    const valStr = _fmt(item.value).replace(/\u00A0/g, ' ');
+                    
+                    doc.setFontSize(9);
+                    doc.setFont('helvetica', item.isParent ? 'bold' : 'normal');
+                    doc.setTextColor(...(item.isChild ? cTextLight : cText));
+                    
+                    // Trata multilinhas para nomes longos com X dinâmico
+                    const xPos = item.isChild ? 22 : 15;
+                    const lines = doc.splitTextToSize(item.name, pageWidth - xPos - 40);
+                    doc.text(lines, xPos, y);
+                    
+                    doc.setFont('helvetica', item.isParent ? 'bold' : 'normal');
+                    doc.setTextColor(...(isIncome ? cSuccess : cText));
+                    doc.text(valStr, pageWidth - 15, y, { align: 'right' });
+                    
+                    y += (lines.length * 5) + 1;
+                    
+                    if (!item.isParent) {
+                        doc.setDrawColor(245, 245, 245);
+                        doc.line(15, y - 2, pageWidth - 15, y - 2);
+                    }
+                });
+                y += 8;
+            };
+
+            // Organização de Dados
+            const catsInc = Object.entries(receitas).sort((a, b) => b[1] - a[1]).map(([name, value]) => ({ name, value }));
+            let catsExp = [];
+
+            if (useGroups && Object.keys(gastos).length > 0) {
+                const grouped = CategoryGroups.groupExpenses(gastos);
+                grouped.forEach(g => {
+                    catsExp.push({ name: g.parent.name, value: g.total, isParent: true });
+                    g.children.forEach(c => catsExp.push({ name: c.name, value: c.value, isChild: true }));
+                });
+            } else {
+                catsExp = Object.entries(gastos).sort((a, b) => b[1] - a[1]).map(([name, value]) => ({ name, value }));
+            }
+
+            renderItemList('Receitas por Categoria', catsInc, true);
+            renderItemList('Despesas por Categoria', catsExp, false);
+
+            if (catsInc.length === 0 && catsExp.length === 0) {
+                doc.setFont('helvetica', 'normal');
+                doc.setTextColor(...cTextLight);
+                doc.text('Nenhum registro para este período.', pageWidth / 2, y + 10, { align: 'center' });
+            }
+
+            // 4. Numeração e Download
+            const totalPages = doc.internal.getNumberOfPages();
+            for (let i = 1; i <= totalPages; i++) {
+                doc.setPage(i);
+                doc.setFontSize(7);
+                doc.setTextColor(...cTextLight);
+                doc.setFont('helvetica', 'normal');
+                doc.text(`Página ${i} de ${totalPages}`, pageWidth / 2, pageHeight - 10, { align: 'center' });
+            }
+
+            const cleanName = mLabel.replace(/[^a-z0-9]/gi, '_');
+            doc.save(`Resumo_Categorias_${cleanName}.pdf`);
+
+        } catch (e) {
+            console.error('[jsPDF Export Error]:', e);
+            if (typeof showToast === 'function') showToast('Erro ao exportar PDF.', 'danger');
+        } finally {
+            btn.classList.remove('btn-is-loading');
+        }
     }
 
     // API Pública
