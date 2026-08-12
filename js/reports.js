@@ -735,33 +735,184 @@ const ReportsModule = (function () {
     }
 
     // ===================================================
-    // EXPORTAÇÃO: TERMÔMETRO DE IMPREVISTOS PARA PDF
+    // EXPORTAÇÃO: TERMÔMETRO DE IMPREVISTOS PARA PDF (VETORIAL)
     // ===================================================
     async function exportImprevistosToPDF() {
-        const element = document.getElementById('report5-content');
-        if (!element) return;
-        
-        // Feedback visual do botão (opcional)
-        const btn = event.currentTarget;
-        const oldOpacity = btn.style.opacity;
-        btn.style.opacity = '0.5';
+        const btn = document.getElementById('btn-export-imprevistos');
+        if (!btn || btn.classList.contains('btn-is-loading')) return;
 
-        // Prepara o elemento para impressão
-        element.classList.add('pdf-export-mode');
-        
-        const opt = {
-            margin:       15,
-            filename:     `Imprevistos_${_imprevState.year}_${String(_imprevState.month + 1).padStart(2, '0')}.pdf`,
-            image:        { type: 'jpeg', quality: 1 },
-            html2canvas:  { scale: 2, useCORS: true },
-            jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
-        };
+        btn.classList.add('btn-is-loading');
 
-        await html2pdf().set(opt).from(element).save();
+        // Libera a interface para o navegador pintar o spinner de carregamento
+        await new Promise(r => setTimeout(r, 60));
 
-        // Restaura o layout
-        element.classList.remove('pdf-export-mode');
-        btn.style.opacity = oldOpacity;
+        try {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF('p', 'mm', 'a4');
+            const pageWidth = doc.internal.pageSize.getWidth();
+            const pageHeight = doc.internal.pageSize.getHeight();
+            let y = 20;
+
+            // Extração Dinâmica de Cores
+            const rootStyles = getComputedStyle(document.documentElement);
+            const _rgb = (varName, fallback) => _hexToRgb(rootStyles.getPropertyValue(varName).trim() || fallback);
+            const cPrimary = _rgb('--primary', '#C9A84C');
+            const cText = _rgb('--text', '#1C1A17');
+            const cTextLight = _rgb('--text-light', '#6B6150');
+            const cDanger = _rgb('--danger', '#E05252');
+            const cWarning = _rgb('--warning', '#D4A450');
+            const cSuccess = _rgb('--success', '#4CAF7C');
+
+            // --- 1. COLETA DA FONTE ÚNICA DA VERDADE (SSOT) ---
+            const txns = _getTxns();
+            const year = _imprevState.year;
+            const month = _imprevState.month;
+
+            const groups = (typeof CategoryGroups !== 'undefined') ? CategoryGroups.getGroups() : [];
+            const imprevGroup = groups.find(g => g.id === 'imprevistos');
+            const imprevSubs = imprevGroup ? imprevGroup.subcategories : [];
+
+            const totalIncome = _getMonthlyIncome(txns, year, month);
+            const subTotals = {};
+
+            txns.forEach(t => {
+                if (t.type !== 'despesa') return;
+                const cat = t.category || '';
+                const isImprev = imprevSubs.includes(cat) || 
+                                 cat.toLowerCase() === 'imprevistos' || 
+                                 (imprevGroup && imprevSubs.length === 0 && cat.toLowerCase() === 'imprevistos');
+                if (!isImprev) return;
+
+                const d = new Date(t.date + 'T00:00:00');
+                const tYear = d.getFullYear(), tMonth = d.getMonth();
+                if (tYear === year && tMonth === month) {
+                    subTotals[cat] = (subTotals[cat] || 0) + t.amount;
+                } else if (t.isRecurring && (tYear < year || (tYear === year && tMonth < month))) {
+                    if (t.recurrenceEndDate && new Date(year, month, 1) >= new Date(t.recurrenceEndDate)) return;
+                    subTotals[cat] = (subTotals[cat] || 0) + t.amount;
+                }
+            });
+
+            const totalImprev = Object.values(subTotals).reduce((s, v) => s + v, 0);
+            const pct = totalIncome > 0 ? (totalImprev / totalIncome) * 100 : 0;
+            const statusStr = _imprevStatus(pct); // 'ok', 'warning' ou 'danger'
+
+            const monthName = new Date(year, month, 1).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+            const mLabel = monthName.charAt(0).toUpperCase() + monthName.slice(1);
+
+            // --- 2. CABEÇALHO ---
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(16);
+            doc.setTextColor(...cPrimary);
+            doc.text('Relatório: Termômetro de Imprevistos', pageWidth / 2, y, { align: 'center' });
+
+            y += 6;
+            doc.setFontSize(10);
+            doc.setFont('helvetica', 'normal');
+            doc.setTextColor(...cTextLight);
+            doc.text(mLabel, pageWidth / 2, y, { align: 'center' });
+
+            y += 8;
+            doc.setDrawColor(...cPrimary);
+            doc.setLineWidth(0.5);
+            doc.line(15, y, pageWidth - 15, y);
+            y += 15;
+
+            // --- 3. INDICADOR PRINCIPAL (PERCENTUAL) ---
+            doc.setFontSize(36);
+            let pctColor = cSuccess;
+            if (statusStr === 'warning') pctColor = cWarning;
+            if (statusStr === 'danger') pctColor = cDanger;
+            
+            doc.setTextColor(...pctColor);
+            doc.setFont('helvetica', 'bold');
+            doc.text(`${pct.toFixed(1)}%`, pageWidth / 2, y, { align: 'center' });
+
+            y += 6;
+            doc.setFontSize(10);
+            doc.setFont('helvetica', 'normal');
+            doc.setTextColor(...cTextLight);
+            doc.text('da receita comprometida com imprevistos', pageWidth / 2, y, { align: 'center' });
+            
+            y += 15;
+
+            // --- 4. TOTAIS FINANCEIROS ---
+            doc.setDrawColor(220, 220, 220);
+            doc.setFillColor(250, 250, 250);
+            doc.roundedRect(15, y, pageWidth - 30, 20, 3, 3, 'FD');
+            
+            doc.setFontSize(8);
+            doc.setFont('helvetica', 'bold');
+            doc.setTextColor(...cTextLight);
+            doc.text('RECEITA DO MÊS', pageWidth / 4 + 7, y + 7, { align: 'center' });
+            doc.text('TOTAL IMPREVISTOS', (pageWidth / 4) * 3 - 7, y + 7, { align: 'center' });
+
+            doc.setFontSize(12);
+            doc.setTextColor(...cSuccess);
+            doc.text(_fmt(totalIncome).replace(/\u00A0/g, ' '), pageWidth / 4 + 7, y + 15, { align: 'center' });
+            
+            doc.setTextColor(...cDanger);
+            doc.text(_fmt(totalImprev).replace(/\u00A0/g, ' '), (pageWidth / 4) * 3 - 7, y + 15, { align: 'center' });
+
+            y += 30;
+
+            // --- 5. DETALHAMENTO DE SUBCATEGORIAS ---
+            const sortedSubs = Object.entries(subTotals).sort(([, a], [, b]) => b - a);
+
+            if (sortedSubs.length > 0) {
+                doc.setFontSize(11);
+                doc.setTextColor(...cText);
+                doc.setFont('helvetica', 'bold');
+                doc.text('Detalhamento por Subcategoria', 15, y);
+                y += 2;
+                doc.setDrawColor(220, 220, 220);
+                doc.setLineWidth(0.2);
+                doc.line(15, y, pageWidth - 15, y);
+                y += 8;
+
+                sortedSubs.forEach(([name, val]) => {
+                    doc.setFontSize(9);
+                    doc.setFont('helvetica', 'normal');
+                    doc.setTextColor(...cText);
+                    
+                    const lines = doc.splitTextToSize(name, pageWidth - 60);
+                    doc.text(lines, 15, y);
+                    
+                    doc.setFont('helvetica', 'bold');
+                    // Usando um tom alaranjado/avermelhado levemente diferente para imprevistos (opcional, ou usar cDanger)
+                    doc.setTextColor(249, 115, 22); // Corrigido para RGB do Tailwind Orange-500
+                    doc.text(_fmt(val).replace(/\u00A0/g, ' '), pageWidth - 15, y, { align: 'right' });
+                    
+                    y += (lines.length * 5) + 2;
+                    doc.setDrawColor(245, 245, 245);
+                    doc.line(15, y - 2, pageWidth - 15, y - 2);
+                });
+            } else {
+                doc.setFontSize(10);
+                doc.setFont('helvetica', 'normal');
+                doc.setTextColor(...cTextLight);
+                doc.text('Nenhuma despesa de imprevistos registrada neste mês.', pageWidth / 2, y, { align: 'center' });
+            }
+
+            // --- 6. NUMERAÇÃO DE PÁGINAS E SALVAMENTO ---
+            const totalPages = doc.internal.getNumberOfPages();
+            for (let i = 1; i <= totalPages; i++) {
+                doc.setPage(i);
+                doc.setFontSize(7);
+                doc.setTextColor(...cTextLight);
+                doc.setFont('helvetica', 'normal');
+                doc.text(`Página ${i} de ${totalPages}`, pageWidth / 2, pageHeight - 10, { align: 'center' });
+            }
+
+            const cleanName = mLabel.replace(/[^a-z0-9]/gi, '_');
+            doc.save(`Imprevistos_${cleanName}.pdf`);
+
+        } catch (e) {
+            console.error('[jsPDF Export Erro no Termômetro]:', e);
+            if (typeof showToast === 'function') showToast('Erro ao gerar PDF de Imprevistos.', 'danger');
+        } finally {
+            btn.classList.remove('btn-is-loading');
+        }
     }
 
     // ===================================================
