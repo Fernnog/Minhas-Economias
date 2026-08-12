@@ -14,6 +14,24 @@ const BudgetModule = (function() {
         localStorage.setItem('fin_budgets', JSON.stringify(budgetLimits));
     }
 
+    // ── Estado de Interface (UI State) ──────────────
+    let expandedGroups = new Set(); // Lembra quais grupos o usuário abriu
+
+    // ── Helper de Métricas Financeiras (O Fim do Bug dos 100%) ──────────────
+    function _getBudgetMetrics(spent, limit) {
+        if (limit <= 0) return { rawPct: 100, cappedPct: 100, statusClass: 'status-ok' };
+        
+        const rawPct = (spent / limit) * 100; // Porcentagem matemática real
+        const cappedPct = Math.min(rawPct, 100); // Trava visual (impede que a barra vaze da tela)
+        
+        // Nova Regra de Negócio: Vermelho apenas no estouro (> 100%)
+        let statusClass = 'status-ok'; // Verde (< 50%)
+        if (rawPct > 100) statusClass = 'status-danger';
+        else if (rawPct >= 50) statusClass = 'status-warning'; // Dourado/Creme
+        
+        return { rawPct, cappedPct, statusClass };
+    }
+
     // ── Constante compartilhada (escopo do módulo) ──────────────
     const STATUS_ICONS = {
         'status-ok': `<svg class="budget-status-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--success)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-label="OK"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>`,
@@ -28,7 +46,10 @@ const BudgetModule = (function() {
         
         // 1. Estado Base (Mês Civil de Calendário)
         let spent = monthlyExpenses[budget.category] || 0;
-        let percent = Math.min((spent / budget.amount) * 100, 100);
+        const metrics = _getBudgetMetrics(spent, budget.amount);
+        
+        // Ajuste das variáveis baseadas no Helper
+        let percent = metrics.cappedPct;
         
         const hoje = new Date();
         const currentYearMonth = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}`;
@@ -50,7 +71,7 @@ const BudgetModule = (function() {
 
         // Inicializa as variáveis de pacing herdando os valores padrão do calendário
         let pacingPercent = percent;
-        let pacingStatus = percent > 90 ? 'status-danger' : (percent > 70 ? 'status-warning' : 'status-ok');
+        let pacingStatus = metrics.statusClass;
 
         // 2. Interceptação do Projetor (Monitoramento do Ciclo do Cartão)
         if (typeof BudgetProjectorModule !== 'undefined' && typeof BudgetProjectorModule.getProjectorData === 'function') {
@@ -69,16 +90,16 @@ const BudgetModule = (function() {
                     
                     // Ajuste de status: Se gastou mais que o tempo da fatura, fica amarelo.
                     pacingStatus = 'status-ok';
-                    if (percent > 90) pacingStatus = 'status-danger';
-                    else if (isPacingActive && percent > (tempoPercorrido + 10)) pacingStatus = 'status-warning';
-                    else if (!isPacingActive && percent > 70) pacingStatus = 'status-warning';
+                    if (metrics.rawPct > 100) pacingStatus = 'status-danger';
+                    else if (isPacingActive && metrics.rawPct > (tempoPercorrido + 10)) pacingStatus = 'status-warning';
+                    else if (!isPacingActive && metrics.rawPct >= 50) pacingStatus = 'status-warning';
                 }
             }
         }
 
         // 3. Métricas de Exibição Textual (Estritamente baseadas no Mês Civil)
         const remaining = budget.amount - spent;
-        let textStatus = percent > 90 ? 'status-danger' : (percent > 70 ? 'status-warning' : 'status-ok');
+        let textStatus = metrics.statusClass;
         const isPinned = currentPinned.includes(budget.category);
 
         // Renderiza o indicador de ritmo com dados do ciclo, ou a barra convencional com dados do mês
@@ -98,9 +119,9 @@ const BudgetModule = (function() {
             </div>`;
 
         const microCopy = budget.amount > 0
-            ? (percent >= 100
+            ? (metrics.rawPct > 100
                 ? `<span class="budget-micro-copy danger-text">⚠ Orçamento esgotado</span>`
-                : percent > 70
+                : metrics.rawPct >= 50
                 ? `<span class="budget-micro-copy warning-text">${fmt(remaining)} restante — atenção</span>`
                 : `<span class="budget-micro-copy">${fmt(remaining)} disponível</span>`)
             : `<span class="budget-micro-copy">Sem meta — apenas registrando gastos</span>`;
@@ -170,14 +191,12 @@ const BudgetModule = (function() {
 
             const totalSpent    = entry.budgets.reduce((s, b) => s + (monthlyExpenses[b.category] || 0), 0);
             const totalBudgeted = entry.budgets.reduce((s, b) => s + b.amount, 0);
-            const groupPct      = totalBudgeted > 0 ? Math.min((totalSpent / totalBudgeted) * 100, 100) : 0;
-            const groupStatus   = groupPct > 90 ? 'status-danger' : (groupPct > 70 ? 'status-warning' : 'status-ok');
+            const metrics       = _getBudgetMetrics(totalSpent, totalBudgeted);
             const color         = entry.parent.color;
 
-            // Lógica de colapso automático (Prioridade 2)
-            const isOk = groupStatus === 'status-ok';
-            const displayStyle = isOk ? 'display: none;' : 'display: block;';
-            const chevronRot = isOk ? 'transform: rotate(-90deg);' : 'transform: rotate(0deg);';
+            // ESTADO DE UI: Verifica se este grupo foi aberto pelo usuário no passado
+            const isCollapsed = !expandedGroups.has(g.id);
+            const containerClass = isCollapsed ? 'is-collapsed' : '';
 
             html += `
                 <div class="budget-group-section">
@@ -191,16 +210,16 @@ const BudgetModule = (function() {
                             </span>
                             <div style="display:flex; align-items:center; gap:0.5rem;">
                                 <span class="budget-group-total">${fmt(totalSpent)} / ${fmt(totalBudgeted)}</span>
-                                <svg id="budget-group-chevron-${g.id}" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="transition: transform 0.2s; ${chevronRot}">
+                                <svg id="budget-group-chevron-${g.id}" class="group-chevron-icon ${containerClass}" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                     <polyline points="6 9 12 15 18 9"></polyline>
                                 </svg>
                             </div>
                         </div>
                         <div class="progress-track budget-group-bar">
-                            <div class="progress-fill ${groupStatus}" style="width:${groupPct}%;"></div>
+                            <div class="progress-fill ${metrics.statusClass}" style="width:${metrics.cappedPct}%;"></div>
                         </div>
                     </div>
-                    <div id="budget-group-items-${g.id}" class="budget-group-items" style="${displayStyle}">
+                    <div id="budget-group-items-${g.id}" class="budget-group-items ${containerClass}">
                         ${entry.budgets.map(b => _renderSingleRow(b, monthlyExpenses, currentPinned)).join('')}
                     </div>
                 </div>`;
@@ -210,12 +229,10 @@ const BudgetModule = (function() {
             const color         = '#6B7280';
             const totalSpent    = ungrouped.reduce((s, b) => s + (monthlyExpenses[b.category] || 0), 0);
             const totalBudgeted = ungrouped.reduce((s, b) => s + b.amount, 0);
-            const groupPct      = totalBudgeted > 0 ? Math.min((totalSpent / totalBudgeted) * 100, 100) : 0;
-            const groupStatus   = groupPct > 90 ? 'status-danger' : (groupPct > 70 ? 'status-warning' : 'status-ok');
+            const metrics       = _getBudgetMetrics(totalSpent, totalBudgeted);
 
-            const isOk = groupStatus === 'status-ok';
-            const displayStyle = isOk ? 'display: none;' : 'display: block;';
-            const chevronRot = isOk ? 'transform: rotate(-90deg);' : 'transform: rotate(0deg);';
+            const isCollapsed = !expandedGroups.has('ungrouped');
+            const containerClass = isCollapsed ? 'is-collapsed' : '';
 
             html += `
                 <div class="budget-group-section">
@@ -229,16 +246,16 @@ const BudgetModule = (function() {
                             </span>
                             <div style="display:flex; align-items:center; gap:0.5rem;">
                                 <span class="budget-group-total">${fmt(totalSpent)} / ${fmt(totalBudgeted)}</span>
-                                <svg id="budget-group-chevron-ungrouped" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="transition: transform 0.2s; ${chevronRot}">
+                                <svg id="budget-group-chevron-ungrouped" class="group-chevron-icon ${containerClass}" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                     <polyline points="6 9 12 15 18 9"></polyline>
                                 </svg>
                             </div>
                         </div>
                         <div class="progress-track budget-group-bar">
-                            <div class="progress-fill ${groupStatus}" style="width:${groupPct}%;"></div>
+                            <div class="progress-fill ${metrics.statusClass}" style="width:${metrics.cappedPct}%;"></div>
                         </div>
                     </div>
-                    <div id="budget-group-items-ungrouped" class="budget-group-items" style="${displayStyle}">
+                    <div id="budget-group-items-ungrouped" class="budget-group-items ${containerClass}">
                         ${ungrouped.map(b => _renderSingleRow(b, monthlyExpenses, currentPinned)).join('')}
                     </div>
                 </div>`;
@@ -252,12 +269,15 @@ const BudgetModule = (function() {
         const chevron = document.getElementById(`budget-group-chevron-${groupId}`);
         if (!items || !chevron) return;
         
-        if (items.style.display === 'none') {
-            items.style.display = 'block';
-            chevron.style.transform = 'rotate(0deg)';
+        // Manipulação do Set em Memória e transição CSS Declarativa
+        if (expandedGroups.has(groupId)) {
+            expandedGroups.delete(groupId); // Usuário quer fechar
+            items.classList.add('is-collapsed');
+            chevron.classList.add('is-collapsed');
         } else {
-            items.style.display = 'none';
-            chevron.style.transform = 'rotate(-90deg)';
+            expandedGroups.add(groupId); // Usuário quer abrir
+            items.classList.remove('is-collapsed');
+            chevron.classList.remove('is-collapsed');
         }
     }
 
@@ -502,8 +522,9 @@ const BudgetModule = (function() {
                 const totalSpent = activeBudgets.reduce((acc, b) => acc + (monthlyExpenses[b.category] || 0), 0);
                 const totalBudgeted = activeBudgets.reduce((acc, b) => acc + b.amount, 0);
                 
-                const totalPercent = totalBudgeted > 0 ? Math.min((totalSpent / totalBudgeted) * 100, 100) : 0;
-                const totalStatus = totalPercent > 90 ? 'status-danger' : (totalPercent > 70 ? 'status-warning' : 'status-ok');
+                const metrics = _getBudgetMetrics(totalSpent, totalBudgeted);
+                const totalPercent = metrics.cappedPct;
+                const totalStatus = metrics.statusClass;
 
                 const totalValuesEl = document.getElementById('budget-total-values');
                 const totalBarEl = document.getElementById('budget-total-bar');

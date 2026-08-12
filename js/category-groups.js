@@ -13,7 +13,7 @@ const FIXED_PARENTS = [
     { id: 'moradia',     name: 'Moradia',              color: '#3B82F6' },
     { id: 'alimentacao', name: 'Alimentação',           color: '#10B981' },
     { id: 'transporte',  name: 'Transporte',            color: '#F59E0B' },
-    { id: 'saude',       name: 'Saúde',                 color: '#EF4444' },
+    { id: 'saude',       name: 'Saúde',                 color: '#0D9488' }, // Teal (Verde-azulado)
     { id: 'educacao',    name: 'Educação',              color: '#8B5CF6' },
     { id: 'familiares',  name: 'Familiares',            color: '#EC4899' },
     { id: 'lazer',       name: 'Lazer',                 color: '#06B6D4' },
@@ -25,7 +25,22 @@ const FIXED_PARENTS = [
     function _load() {
         try {
             const parsed = JSON.parse(localStorage.getItem(STORAGE_KEY));
-            if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+            if (Array.isArray(parsed) && parsed.length > 0) {
+                // MIGRAÇÃO SILENCIOSA: Corrige a cor da Saúde no cache do usuário, se necessário
+                let needsUpdate = false;
+                parsed.forEach(g => {
+                    if (g.id === 'saude' && (g.color === '#EF4444' || g.color.toLowerCase() === '#ef4444')) {
+                        g.color = '#0D9488'; // Força a nova cor
+                        needsUpdate = true;
+                    }
+                });
+                
+                // Salva no disco do usuário a correção sem que ele perceba
+                if (needsUpdate) {
+                    _persist(parsed);
+                }
+                return parsed;
+            }
         } catch {}
         return _getDefaults();
     }
