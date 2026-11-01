@@ -2,15 +2,19 @@
 let transactions = JSON.parse(localStorage.getItem('fin_transactions')) || [];
 
 /**
- * Retorna uma string segura contendo o dia 25 do mês vigente (ou do seguinte se hoje > 25).
- * Previne inconsistências de data devido a processamentos de fuso horário local.
+ * Retorna uma string YYYY-MM-DD com o dia de vencimento alvo (padrão 25 da CEF, ou 24 do Passaí),
+ * mantendo intacta a regra de negócio de virada do mês (se hoje > 25, avança para o próximo mês).
  */
-function getSmartDefaultDateString() {
+function getSmartDefaultDateString(methodKey = window.DEFAULT_PAYMENT_METHOD || 'cartao2') {
+    const config = (window.PAYMENT_CONFIG && window.PAYMENT_CONFIG[methodKey]) || {};
+    const targetDay = config.defaultDueDay || 25;
+
     const today = new Date();
     let year = today.getFullYear();
     let month = today.getMonth() + 1;
     const day = today.getDate();
 
+    // Regra de mês original preservada integralmente
     if (day > 25) {
         month++;
         if (month > 12) {
@@ -18,8 +22,73 @@ function getSmartDefaultDateString() {
             year++;
         }
     }
-    return `${year}-${String(month).padStart(2, '0')}-25`;
+    return `${year}-${String(month).padStart(2, '0')}-${String(targetDay).padStart(2, '0')}`;
 }
+
+/**
+ * Verifica se o formulário está em modo de edição (lançamento comum, parcelado ou exceção recorrente).
+ */
+function isFormInEditMode() {
+    const transId = document.getElementById('trans-id')?.value;
+    const exceptionParent = document.getElementById('trans-exception-parent')?.value;
+    return Boolean(transId || exceptionParent);
+}
+
+/**
+ * Sincroniza apenas o dia (DD) do campo de data com o meio de pagamento selecionado,
+ * preservando rigorosamente o ano e o mês (YYYY-MM) já presentes no input.
+ * Executado APENAS durante a criação de um novo lançamento.
+ */
+function syncDateWithPaymentMethod(methodValue) {
+    if (isFormInEditMode()) return; // Trava crítica: nunca altera datas no modo de edição
+
+    const dateInput = document.getElementById('trans-date');
+    const config = window.PAYMENT_CONFIG && window.PAYMENT_CONFIG[methodValue];
+    if (!dateInput || !config || !config.defaultDueDay) return;
+
+    const targetDayStr = String(config.defaultDueDay).padStart(2, '0');
+
+    if (dateInput.value && /^\d{4}-\d{2}-\d{2}$/.test(dateInput.value)) {
+        const [yearStr, monthStr, currentDayStr] = dateInput.value.split('-');
+        if (currentDayStr !== targetDayStr) {
+            dateInput.value = `${yearStr}-${monthStr}-${targetDayStr}`;
+            dateInput.classList.remove('date-updated-flash');
+            void dateInput.offsetWidth; // Reflow síncrono leve para reiniciar animação CSS
+            dateInput.classList.add('date-updated-flash');
+        }
+    } else {
+        dateInput.value = getSmartDefaultDateString(methodValue);
+    }
+}
+
+/**
+ * Restaura o formulário de lançamento para o estado limpo de criação (Padrão: CEF + Dia 25).
+ */
+function resetTransactionForm() {
+    const defaultMethod = window.DEFAULT_PAYMENT_METHOD || 'cartao2';
+    if (form) form.reset();
+    unlockRecurrenceField();
+    setPaymentChip(defaultMethod);
+
+    const idEl = document.getElementById('trans-id');
+    const exParentEl = document.getElementById('trans-exception-parent');
+    const exDateEl = document.getElementById('trans-exception-date');
+    const scopeContainer = document.getElementById('edit-scope-container');
+    const btnSave = document.getElementById('btn-save');
+    const transDateInput = document.getElementById('trans-date');
+
+    if (idEl) idEl.value = '';
+    if (exParentEl) exParentEl.value = '';
+    if (exDateEl) exDateEl.value = '';
+    if (scopeContainer) scopeContainer.classList.add('hidden');
+    if (btnSave) btnSave.innerText = 'Salvar Lançamento';
+    if (transDateInput) transDateInput.value = getSmartDefaultDateString(defaultMethod);
+}
+
+window.startNewTransaction = function() {
+    resetTransactionForm();
+    showView('form');
+};
 let categories = JSON.parse(localStorage.getItem('fin_categories')) || ['Alimentação', 'Moradia', 'Transporte', 'Salário', 'Lazer'];
 let pinnedBudgets = JSON.parse(localStorage.getItem('fin_pinned_budgets')) || [];
 
@@ -144,7 +213,7 @@ window.getMonthIncome = function(mesAlvo, anoAlvo) {
 
 window.cyclePaymentMethod = function() {
     const hiddenInput = document.getElementById('trans-payment-method');
-    const toggleEl   = document.getElementById('payment-chip-toggle');
+    const toggleEl    = document.getElementById('payment-chip-toggle');
     if (!hiddenInput || !toggleEl) return;
 
     const currentIndex = PAYMENT_CYCLE.indexOf(hiddenInput.value);
@@ -164,6 +233,9 @@ window.cyclePaymentMethod = function() {
     
     toggleEl.style.transform = "scale(0.95)";
     setTimeout(() => toggleEl.style.transform = "", 100);
+
+    // Atualiza o dia (25 <-> 24) somente se for um novo lançamento
+    syncDateWithPaymentMethod(nextValue);
 };
 
 window.setPaymentChip = function(value) {
@@ -311,8 +383,7 @@ function init() {
     const headerDate = document.getElementById('header-date');
     if (headerDate) headerDate.innerText = new Date().toLocaleDateString('pt-BR');
     
-    const transDate = document.getElementById('trans-date');
-    if (transDate) transDate.value = getSmartDefaultDateString();
+    resetTransactionForm();
     
     populateCategoryGroups();
     
@@ -1070,14 +1141,8 @@ form.addEventListener('submit', function(e) {
     // FASE 1: INTEGRIDADE DE DADOS (Execução Imediata Síncrona)
     saveData(); 
     
-    // FASE 2: RESET VISUAL DO FORMULÁRIO (Operações Dom Leves)
-    form.reset();
-    unlockRecurrenceField(); 
-    setPaymentChip('');
-    document.getElementById('trans-id').value = '';
-    document.getElementById('btn-save').innerText = 'Salvar Lançamento';
-    const transDateInput = document.getElementById('trans-date');
-    if (transDateInput) transDateInput.value = getSmartDefaultDateString();
+    // FASE 2: RESET VISUAL DO FORMULÁRIO (Operações DOM Leves e Higienização de Estado)
+    resetTransactionForm();
 
     // FASE 3: FEEDBACK E NAVEGAÇÃO RÁPIDA (UX Instântanea)
     showToast(id ? 'Lançamento atualizado com sucesso!' : 'Novo lançamento salvo!');

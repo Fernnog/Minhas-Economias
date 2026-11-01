@@ -5,7 +5,10 @@
  * via window.PAYMENT_CONFIG e window.PAYMENT_CYCLE de qualquer script.
  */
 
-window.PAYMENT_CYCLE = ['', 'debito', 'cartao1', 'cartao2'];
+window.DEFAULT_PAYMENT_METHOD = 'cartao2';
+
+// Ciclo otimizado: CEF -> Passaí (apenas 1 clique de distância) -> Débito -> Sem método
+window.PAYMENT_CYCLE = ['cartao2', 'cartao1', 'debito', ''];
 
 window.PAYMENT_CONFIG = {
     '': {
@@ -15,6 +18,7 @@ window.PAYMENT_CONFIG = {
         clsToggle:  'chip-state-blank',
         clsExtract: '',                   // Sem chip no extrato para lançamentos sem método
         color: 'var(--text-light)',
+        defaultDueDay: null,
         svg: `<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <circle cx="12" cy="12" r="9" stroke-dasharray="3 3"></circle>
                 <line x1="12" y1="8" x2="12" y2="16"></line>
@@ -28,6 +32,7 @@ window.PAYMENT_CONFIG = {
         clsToggle:  'chip-state-debito',
         clsExtract: 'chip-debito',
         color: '#2563EB',
+        defaultDueDay: null,
         svg: `<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                 <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
               </svg>`
@@ -39,6 +44,7 @@ window.PAYMENT_CONFIG = {
         clsToggle:  'chip-state-cartao1',
         clsExtract: 'chip-cartao1',
         color: '#059669', // Verde (você pode alterar para a cor da marca se desejar)
+        defaultDueDay: 24, // Vencimento fixo Passaí
         svg: `<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                 <rect x="1" y="4" width="22" height="16" rx="2"></rect>
                 <line x1="1" y1="10" x2="23" y2="10"></line>
@@ -52,6 +58,7 @@ window.PAYMENT_CONFIG = {
         clsToggle:  'chip-state-cartao2',
         clsExtract: 'chip-cartao2',
         color: '#7C3AED', // Roxo (você pode alterar para o azul da Caixa, ex: '#005CA9')
+        defaultDueDay: 25, // Vencimento fixo CEF
         svg: `<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                 <rect x="1" y="4" width="22" height="16" rx="2"></rect>
                 <line x1="1" y1="10" x2="23" y2="10"></line>
