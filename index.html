@@ -166,24 +166,25 @@
                             <input type="text" id="trans-amount" inputmode="numeric" placeholder="0,00" required>
                             <label>Categoria</label>
                             <select id="trans-category" required></select>
+
+                            <label>Meio de Pagamento</label>
+                            <input type="hidden" id="trans-payment-method" value="cartao2">
+                            <div id="payment-chip-toggle" class="payment-chip-toggle chip-state-cartao2" 
+                                 onclick="cyclePaymentMethod()" title="Clique para selecionar o meio de pagamento">
+                                <span class="chip-toggle-icon">
+                                    <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                        <rect x="1" y="4" width="22" height="16" rx="2"></rect>
+                                        <line x1="1" y1="10" x2="23" y2="10"></line>
+                                        <line x1="6" y1="15" x2="12" y2="15"></line>
+                                    </svg>
+                                </span>
+                                <span class="chip-toggle-label">CEF</span>
+                            </div>
+
                             <label>Data</label>
                             <input type="date" id="trans-date" required>
                             <label>Descrição</label>
                             <input type="text" id="trans-desc" required>
-                            
-                            <label>Meio de Pagamento</label>
-                            <input type="hidden" id="trans-payment-method" value="">
-                            <div id="payment-chip-toggle" class="payment-chip-toggle chip-state-blank" 
-                                 onclick="cyclePaymentMethod()" title="Clique para selecionar o meio de pagamento">
-                                <span class="chip-toggle-icon">
-                                    <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                        <circle cx="12" cy="12" r="9" stroke-dasharray="3 3"></circle>
-                                        <line x1="12" y1="8" x2="12" y2="16"></line>
-                                        <line x1="8" y1="12" x2="16" y2="12"></line>
-                                    </svg>
-                                </span>
-                                <span class="chip-toggle-label">Sem método</span>
-                            </div>
 
                             <label style="margin-top: 1rem;">Tipo de Repetição</label>
                             <select id="trans-recurrence-type">
@@ -504,7 +505,7 @@
 
         <!-- Dock de Navegação Global -->
         <div id="global-dock" class="global-dock">
-            <button id="btn-novo-lancamento" class="icon-btn btn-dark-gold" title="Novo Lançamento" onclick="showView('form')">
+            <button id="btn-novo-lancamento" class="icon-btn btn-dark-gold" title="Novo Lançamento" onclick="startNewTransaction()">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
             </button>
             <button id="btn-ver-movimentos" class="icon-btn btn-extrato" title="Gerenciar Movimentações" onclick="showView('extract')">

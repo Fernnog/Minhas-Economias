@@ -1998,3 +1998,15 @@ button.btn-voltar.btn-dark-gold {
     page-break-inside: avoid;
     break-inside: avoid;
 }
+
+/* =============================================
+   FEEDBACK VISUAL DE DATA AUTOMÁTICA (FORMULÁRIO)
+   ============================================= */
+@keyframes date-auto-highlight {
+    0%   { background-color: rgba(201, 168, 76, 0.28); border-color: var(--primary); }
+    100% { background-color: #fafafa; border-color: var(--border); }
+}
+
+.date-updated-flash {
+    animation: date-auto-highlight 0.75s ease-out;
+}
